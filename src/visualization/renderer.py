@@ -1,88 +1,188 @@
 """
-MAZESolver — Pygame Renderer
-============================
-Handles window initialization, grid rendering, animated search progression,
-HUD integration, user keyboard controls, and screenshot export.
+MAZESolver — Advanced Pygame Renderer (v2.0)
+============================================
+Features:
+- Exploration Heatmap Gradient (cold blue to hot orange/magenta)
+- Smooth cell fade-in transition
+- Frontier cell dynamic glow ring
+- Progressive traveling solution path animation
+- Celebratory goal particle burst system
+- Pulsing start and goal nodes
+- Live Tabbed HUD (Stats, Inspector, Explainer)
+- On-the-fly theme switching (Dark, Neon, Retro, Light)
+- Synchronized sound effects (exploration ticks and goal fanfare)
+- High-res PNG screenshot and animated GIF exports
 """
 import datetime
+import math
 import os
-import sys
 import pygame
-from typing import Dict, Any, Set, Tuple
+from typing import Dict, Any, Set, Tuple, List, Optional
 
 from src.maze import Maze
-from src.visualization.colors import (
-    BG_COLOR,
-    WALL_COLOR,
-    OPEN_COLOR,
-    START_COLOR,
-    GOAL_COLOR,
-    VISITED_COLOR,
-    PATH_COLOR,
-    FRONTIER_COLOR,
-    BORDER_COLOR,
-    HUD_WIDTH,
-)
+from src.config import Config
+from src.visualization.themes import get_theme, next_theme
 from src.visualization.hud import HUD
+from src.visualization.particles import Particle
+from src.visualization.sound_manager import SoundManager
+from src.visualization.gif_exporter import GIFExporter
+
+
+def lerp_color(
+    c1: Tuple[int, int, int], c2: Tuple[int, int, int], t: float
+) -> Tuple[int, int, int]:
+    """Linearly interpolates between two RGB colors by factor t (0.0 to 1.0)."""
+    t = max(0.0, min(1.0, t))
+    return (
+        int(c1[0] + (c2[0] - c1[0]) * t),
+        int(c1[1] + (c2[1] - c1[1]) * t),
+        int(c1[2] + (c2[2] - c1[2]) * t),
+    )
 
 
 class Renderer:
-    ANIMATION_FPS = 60
-
-    def __init__(self, maze: Maze, result: Dict[str, Any], algo_name: str):
+    def __init__(
+        self,
+        maze: Maze,
+        result: Dict[str, Any],
+        algo_name: str,
+        theme_name: Optional[str] = None,
+        export_gif: bool = False,
+    ):
         self.maze = maze
         self.result = result
         self.algo_name = algo_name
+        self.cfg = Config.get()
 
         pygame.init()
 
-        # Dynamic cell sizing based on grid dimensions
+        # Theme initialization
+        self.theme_name = (
+            theme_name if theme_name else self.cfg.get_val("theme", "dark")
+        )
+        self.theme = get_theme(self.theme_name)
+
+        # Display sizing
         max_dim = max(maze.rows, maze.cols)
-        self.cell_size = max(10, min(40, 700 // max_dim))
+        override = self.cfg.get_val("cell_size_override", None)
+        self.cell_size = (
+            override if override else max(10, min(40, 700 // max_dim))
+        )
+        self.hud_width = self.cfg.get_val("hud_width", 280)
 
         self.maze_width = maze.cols * self.cell_size
         self.maze_height = maze.rows * self.cell_size
 
-        self.window_width = self.maze_width + HUD_WIDTH
-        self.window_height = max(self.maze_height, 460)
+        self.window_width = self.maze_width + self.hud_width
+        self.window_height = max(self.maze_height, 480)
 
-        pygame.display.set_caption(f"MAZESolver — {algo_name}")
+        pygame.display.set_caption(f"MAZESolver 2.0 — {algo_name}")
         self.screen = pygame.display.set_mode((self.window_width, self.window_height))
         self.clock = pygame.time.Clock()
 
-        self.hud = HUD(self.screen, self.maze_width, self.window_height)
+        self.hud = HUD(
+            self.screen, self.maze_width, self.window_height, hud_width=self.hud_width
+        )
+        self.sound = SoundManager(
+            enabled=self.cfg.get_val("sound_enabled", True),
+            volume=self.cfg.get_val("sound_volume", 0.3),
+        )
 
         # Animation states
         self.visited_nodes = result.get("visited", [])
         self.solution_path = result.get("path", [])
+        self.frontier_history = result.get("frontier_history", [])
         self.found = result.get("found", False)
         self.time_taken = result.get("time_taken", 0.0)
 
-        self.steps_per_frame = max(1, len(self.visited_nodes) // 180)
+        # Precompute heatmap colors
+        self.visited_colors: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
+        self._recompute_heatmap()
+
+        # Visual enhancement state
+        self.fade_progress: Dict[Tuple[int, int], int] = {}
+        self.fade_frames = self.cfg.get_val("fade_frames", 8)
+        self.revealed_visited: Set[Tuple[int, int]] = set()
+
+        self.particles: List[Particle] = []
+        self.goal_burst_triggered = False
+
+        self.path_reveal_step = 0
+        self.steps_per_frame = max(
+            1,
+            self.cfg.get_val("steps_per_frame", 3)
+            if len(self.visited_nodes) < 100
+            else len(self.visited_nodes) // 100,
+        )
         self.current_step = 0
         self.is_paused = False
         self.is_running = True
         self.status = "SEARCHING"
 
-    def draw_cell(self, pos: Tuple[int, int], color: Tuple[int, int, int]) -> None:
-        """Draws a single grid cell with a subtle border."""
-        r, c = pos
-        rect = pygame.Rect(
-            c * self.cell_size,
-            r * self.cell_size,
-            self.cell_size,
-            self.cell_size,
-        )
-        pygame.draw.rect(self.screen, color, rect)
-        if self.cell_size > 8:
-            pygame.draw.rect(self.screen, BORDER_COLOR, rect, 1)
+        # GIF Exporter
+        self.export_gif_flag = export_gif
+        self.gif_exporter: Optional[GIFExporter] = None
+        if export_gif:
+            self.gif_exporter = GIFExporter(
+                skip_frames=self.cfg.get_val("gif_skip_frames", 3),
+                fps=self.cfg.get_val("gif_fps", 15),
+            )
 
-    def draw_grid(self, revealed_visited: Set[Tuple[int, int]], show_path: bool) -> None:
-        """
-        Draws the maze grid respecting visual precedence:
-        Start / Goal > Path > Frontier > Visited > Wall > Open
-        """
-        path_set = set(self.solution_path) if show_path else set()
+    def _recompute_heatmap(self) -> None:
+        """Assigns gradient colors from cold to hot based on visitation order."""
+        total = max(1, len(self.visited_nodes))
+        cold = self.theme["visited_cold"]
+        hot = self.theme["visited_hot"]
+        self.visited_colors.clear()
+        for idx, pos in enumerate(self.visited_nodes):
+            t = idx / (total - 1) if total > 1 else 0.0
+            self.visited_colors[pos] = lerp_color(cold, hot, t)
+
+    def draw_glow(
+        self,
+        pos: Tuple[int, int],
+        glow_color: Tuple[int, int, int],
+        radius: int = 4,
+    ) -> None:
+        """Renders an expanding, soft glowing halo around a cell."""
+        r, c = pos
+        cx = c * self.cell_size + self.cell_size // 2
+        cy = r * self.cell_size + self.cell_size // 2
+        glow_size = self.cell_size + radius * 2
+        glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
+
+        for i in range(radius, 0, -1):
+            alpha = int(45 * (1.0 - i / (radius + 1)))
+            pygame.draw.rect(
+                glow_surf,
+                (*glow_color, alpha),
+                (radius - i, radius - i, self.cell_size + i * 2, self.cell_size + i * 2),
+                border_radius=4,
+            )
+        self.screen.blit(glow_surf, (cx - glow_size // 2, cy - glow_size // 2))
+
+    def draw_cell(
+        self,
+        pos: Tuple[int, int],
+        color: Tuple[int, int, int],
+        size_offset: int = 0,
+    ) -> None:
+        """Renders a single grid square with theme border styling."""
+        r, c = pos
+        x = c * self.cell_size - size_offset // 2
+        y = r * self.cell_size - size_offset // 2
+        sz = self.cell_size + size_offset
+        rect = pygame.Rect(x, y, sz, sz)
+        pygame.draw.rect(self.screen, color, rect)
+        if self.cell_size > 8 and size_offset == 0:
+            pygame.draw.rect(self.screen, self.theme["border"], rect, 1)
+
+    def draw_maze(self) -> None:
+        """Renders all grid cells adhering to visual hierarchy."""
+        ticks = pygame.time.get_ticks()
+        pulse = int(math.sin(ticks * 0.004) * 3)
+
+        revealed_path_set = set(self.solution_path[: self.path_reveal_step])
         frontier_pos = (
             self.visited_nodes[self.current_step - 1]
             if 0 < self.current_step <= len(self.visited_nodes)
@@ -93,29 +193,64 @@ class Renderer:
             for c in range(self.maze.cols):
                 pos = (r, c)
                 if pos == self.maze.start:
-                    color = START_COLOR
+                    self.draw_cell(pos, self.theme["start"], size_offset=pulse)
                 elif pos == self.maze.goal:
-                    color = GOAL_COLOR
-                elif pos in path_set:
-                    color = PATH_COLOR
-                elif pos == frontier_pos and self.status == "SEARCHING":
-                    color = FRONTIER_COLOR
-                elif pos in revealed_visited:
-                    color = VISITED_COLOR
+                    self.draw_cell(pos, self.theme["goal"], size_offset=pulse)
+                elif pos in revealed_path_set:
+                    # Flash leading edge of path
+                    is_head = (
+                        self.path_reveal_step > 0
+                        and pos == self.solution_path[self.path_reveal_step - 1]
+                        and self.path_reveal_step < len(self.solution_path)
+                    )
+                    path_color = (
+                        (255, 255, 255) if is_head else self.theme["path"]
+                    )
+                    self.draw_cell(pos, path_color)
+                elif pos in self.revealed_visited:
+                    # Cell fade-in blending
+                    prog = self.fade_progress.get(pos, self.fade_frames)
+                    ratio = min(1.0, prog / max(1, self.fade_frames))
+                    target_color = self.visited_colors.get(
+                        pos, self.theme["visited_cold"]
+                    )
+                    rendered_color = lerp_color(
+                        self.theme["open"], target_color, ratio
+                    )
+                    self.draw_cell(pos, rendered_color)
                 elif self.maze.is_wall(pos):
-                    color = WALL_COLOR
+                    self.draw_cell(pos, self.theme["wall"])
                 else:
-                    color = OPEN_COLOR
+                    self.draw_cell(pos, self.theme["open"])
 
-                self.draw_cell(pos, color)
+        # Render frontier halo ring
+        if frontier_pos and self.status == "SEARCHING":
+            self.draw_glow(
+                frontier_pos,
+                self.theme["glow"],
+                radius=self.cfg.get_val("glow_radius", 4),
+            )
+            self.draw_cell(frontier_pos, self.theme["frontier"])
 
-    def save_screenshot(self) -> None:
-        """Saves current window surface to output/screenshots/."""
-        project_root = os.path.dirname(
+    def trigger_goal_burst(self) -> None:
+        """Emits celebratory particles from the goal cell."""
+        if not self.goal_burst_triggered and self.maze.goal:
+            self.goal_burst_triggered = True
+            gr, gc = self.maze.goal
+            px = gc * self.cell_size + self.cell_size / 2.0
+            py = gr * self.cell_size + self.cell_size / 2.0
+            count = self.cfg.get_val("particle_count", 40)
+            for _ in range(count):
+                self.particles.append(Particle(px, py, self.theme["goal"]))
+            self.sound.play_goal()
+
+    def save_screenshot(self) -> str:
+        """Saves current canvas state as a timestamped PNG file."""
+        root = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
-        screenshots_dir = os.path.join(project_root, "output", "screenshots")
-        os.makedirs(screenshots_dir, exist_ok=True)
+        shots_dir = os.path.join(root, "output", "screenshots")
+        os.makedirs(shots_dir, exist_ok=True)
 
         clean_algo = (
             self.algo_name.lower()
@@ -123,21 +258,49 @@ class Renderer:
             .replace("(", "")
             .replace(")", "")
             .replace("=", "")
+            .replace("*", "star")
         )
         clean_maze = os.path.splitext(os.path.basename(self.maze.filepath))[0]
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{clean_algo}_{clean_maze}_{timestamp}.png"
-        filepath = os.path.join(screenshots_dir, filename)
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{clean_algo}_{clean_maze}_{ts}.png"
+        filepath = os.path.join(shots_dir, filename)
 
         pygame.image.save(self.screen, filepath)
-        print(f"[Screenshot] Saved to {filepath}")
+        print(f"[Screenshot] Saved: {filepath}")
+        return filepath
+
+    def export_gif(self) -> str:
+        """Encodes captured frames into a looping animated GIF."""
+        root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        gifs_dir = os.path.join(root, "output", "gifs")
+        os.makedirs(gifs_dir, exist_ok=True)
+
+        clean_algo = (
+            self.algo_name.lower()
+            .replace(" ", "_")
+            .replace("(", "")
+            .replace(")", "")
+            .replace("=", "")
+            .replace("*", "star")
+        )
+        clean_maze = os.path.splitext(os.path.basename(self.maze.filepath))[0]
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{clean_algo}_{clean_maze}_{ts}.gif"
+        filepath = os.path.join(gifs_dir, filename)
+
+        if not self.gif_exporter:
+            self.gif_exporter = GIFExporter(skip_frames=3, fps=15)
+            self.gif_exporter.capture(self.screen)
+
+        self.gif_exporter.export(filepath)
+        return filepath
 
     def run(self) -> None:
-        """Main Pygame display and animation loop."""
-        revealed_visited: Set[Tuple[int, int]] = set()
-
+        """Main rendering, input, and animation loop."""
         while self.is_running:
-            # Handle Pygame events
+            # Event processing
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.is_running = False
@@ -148,51 +311,125 @@ class Renderer:
                     elif event.key == pygame.K_SPACE:
                         self.is_paused = not self.is_paused
                     elif event.key == pygame.K_r:
-                        # Reset animation
+                        # Reset
                         self.current_step = 0
-                        revealed_visited.clear()
+                        self.path_reveal_step = 0
+                        self.revealed_visited.clear()
+                        self.fade_progress.clear()
+                        self.particles.clear()
+                        self.goal_burst_triggered = False
                         self.status = "SEARCHING"
                         self.is_paused = False
                     elif event.key == pygame.K_s:
                         self.save_screenshot()
+                    elif event.key == pygame.K_g:
+                        self.export_gif()
+                    elif event.key == pygame.K_t:
+                        self.theme_name = next_theme(self.theme_name)
+                        self.theme = get_theme(self.theme_name)
+                        self._recompute_heatmap()
+                    elif event.key == pygame.K_m:
+                        self.sound.toggle_mute()
+                    elif event.key == pygame.K_1:
+                        self.hud.active_tab = 1
+                    elif event.key == pygame.K_2:
+                        self.hud.active_tab = 2
+                    elif event.key == pygame.K_3:
+                        self.hud.active_tab = 3
                     elif event.key == pygame.K_UP:
-                        self.steps_per_frame = min(50, self.steps_per_frame + 1)
+                        self.steps_per_frame = min(100, self.steps_per_frame + 2)
                     elif event.key == pygame.K_DOWN:
-                        self.steps_per_frame = max(1, self.steps_per_frame - 1)
+                        self.steps_per_frame = max(1, self.steps_per_frame - 2)
 
-            # Advance animation if not paused
-            if not self.is_paused and self.status == "SEARCHING":
-                if self.current_step < len(self.visited_nodes):
-                    target_step = min(
-                        len(self.visited_nodes),
-                        self.current_step + self.steps_per_frame,
-                    )
-                    for i in range(self.current_step, target_step):
-                        revealed_visited.add(self.visited_nodes[i])
-                    self.current_step = target_step
-                else:
-                    self.status = "SOLVED" if self.found else "NO PATH"
+            # Advance search exploration
+            if not self.is_paused:
+                # Update cell fades
+                for pos in list(self.fade_progress.keys()):
+                    if self.fade_progress[pos] < self.fade_frames:
+                        self.fade_progress[pos] += 1
+
+                if self.status == "SEARCHING":
+                    if self.current_step < len(self.visited_nodes):
+                        target = min(
+                            len(self.visited_nodes),
+                            self.current_step + self.steps_per_frame,
+                        )
+                        for i in range(self.current_step, target):
+                            node_pos = self.visited_nodes[i]
+                            self.revealed_visited.add(node_pos)
+                            self.fade_progress[node_pos] = 0
+
+                        # Play audio tick periodically
+                        if self.current_step % 4 == 0:
+                            self.sound.play_tick()
+
+                        self.current_step = target
+                    else:
+                        # Exploration complete, start progressive path reveal
+                        if self.found:
+                            self.status = "REVEALING_PATH"
+                        else:
+                            self.status = "NO PATH"
+
+                elif self.status == "REVEALING_PATH":
+                    if self.path_reveal_step < len(self.solution_path):
+                        self.path_reveal_step += max(1, self.steps_per_frame // 2)
+                    else:
+                        self.path_reveal_step = len(self.solution_path)
+                        self.status = "SOLVED"
+                        self.trigger_goal_burst()
+
+            # Update particles
+            for p in self.particles:
+                p.update()
+            self.particles = [p for p in self.particles if p.is_alive]
 
             # Clear background
-            self.screen.fill(BG_COLOR)
+            self.screen.fill(self.theme["bg"])
 
-            # Draw maze
-            show_path = self.status == "SOLVED"
-            self.draw_grid(revealed_visited, show_path)
+            # Draw Maze Grid
+            self.draw_maze()
+
+            # Draw Particles
+            for p in self.particles:
+                p.draw(self.screen)
 
             # Draw HUD
+            frontier_snap = (
+                self.frontier_history[self.current_step - 1]
+                if 0 < self.current_step <= len(self.frontier_history)
+                else None
+            )
             explored_count = min(self.current_step, len(self.visited_nodes))
-            path_length = len(self.solution_path) if self.found else 0
+            path_len = len(self.solution_path) if self.found else 0
+
             self.hud.draw(
                 algo_name=self.algo_name,
                 maze_filename=self.maze.filepath,
                 nodes_explored=explored_count,
-                path_length=path_length,
+                path_length=path_len,
                 time_taken=self.time_taken,
-                status=self.status,
+                status="SOLVED" if self.status == "REVEALING_PATH" else self.status,
+                theme=self.theme,
+                theme_name=self.theme_name,
+                total_cells=self.maze.rows * self.maze.cols,
+                frontier_snapshot=frontier_snap,
+                sound_enabled=self.sound.enabled,
+                steps_per_frame=self.steps_per_frame,
             )
 
+            # Frame capture for GIF export
+            if self.gif_exporter:
+                self.gif_exporter.capture(self.screen)
+                if (
+                    self.status in ("SOLVED", "NO PATH")
+                    and len(self.particles) == 0
+                    and self.export_gif_flag
+                ):
+                    self.export_gif()
+                    self.is_running = False
+
             pygame.display.flip()
-            self.clock.tick(self.ANIMATION_FPS)
+            self.clock.tick(self.cfg.get_val("animation_fps", 60))
 
         pygame.quit()

@@ -5,7 +5,7 @@ A variant of DFS that terminates search branches exceeding a specified depth lim
 Prevents infinite looping in unbounded search spaces.
 """
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 from src.node import Node
 from src.algorithms.base_solver import BaseSolver
 from src.maze import Maze
@@ -15,6 +15,7 @@ class DLSSolver(BaseSolver):
     def __init__(self, maze: Maze, limit: Optional[int] = None):
         super().__init__(maze)
         self.limit: int = limit if limit is not None else (maze.rows + maze.cols)
+        self.frontier_history: List[List[Tuple[int, int]]] = []
 
     def solve(self) -> Dict[str, Any]:
         """
@@ -27,6 +28,7 @@ class DLSSolver(BaseSolver):
         stack = [start_node]
         visited = set()
         visited_order = []
+        self.frontier_history = []
 
         while stack:
             current = stack.pop()
@@ -36,6 +38,7 @@ class DLSSolver(BaseSolver):
 
             visited.add(current.position)
             visited_order.append(current.position)
+            self.frontier_history.append([n.position for n in reversed(stack[-8:])])
 
             if current.position == self.maze.goal:
                 path = current.get_path()
@@ -48,6 +51,7 @@ class DLSSolver(BaseSolver):
                     "time_taken": elapsed,
                     "found": True,
                     "depth_limit": self.limit,
+                    "frontier_history": self.frontier_history,
                 }
 
             if current.depth >= self.limit:
@@ -66,4 +70,5 @@ class DLSSolver(BaseSolver):
             "time_taken": elapsed,
             "found": False,
             "depth_limit": self.limit,
+            "frontier_history": self.frontier_history,
         }

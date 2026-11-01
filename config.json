@@ -1,0 +1,17 @@
+{
+  "theme": "dark",
+  "animation_fps": 60,
+  "steps_per_frame": 3,
+  "sound_enabled": true,
+  "sound_volume": 0.3,
+  "cell_size_override": null,
+  "hud_width": 280,
+  "hud_default_tab": 1,
+  "gif_fps": 15,
+  "gif_skip_frames": 3,
+  "default_dls_limit_multiplier": 1.5,
+  "particle_count": 40,
+  "particle_gravity": 0.15,
+  "glow_radius": 3,
+  "fade_frames": 8
+}

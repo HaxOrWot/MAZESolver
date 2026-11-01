@@ -20,8 +20,8 @@ venv/
 htmlcov/
 
 # Output (auto-generated, don't commit)
-output/screenshots/
-output/results_log.txt
+output/
+data/generated/
 
 # IDE
 .vscode/
