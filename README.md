@@ -10,6 +10,24 @@
 
 ---
 
+## ⚡ Super Short Commands (Fast Start)
+
+No need to write long paths or complex arguments! Use `.\maze` (PowerShell/CMD) or `python run.py`:
+
+| What you want to do | Short Command (Windows) | Cross-Platform |
+|---------------------|-------------------------|----------------|
+| **Launch Visualizer** | `.\maze` | `python run.py` |
+| **Compare all 5 algorithms** | `.\maze -c` | `python run.py -c` |
+| **Split-screen comparison (3 panels)** | `.\maze -s` | `python run.py -s` |
+| **Interactive Maze Editor** | `.\maze -e` | `python run.py -e` |
+| **Solve 50x50 Maze** | `.\maze 50` | `python run.py 50` |
+| **Solve 100x100 with A\*** | `.\maze 100 astar` | `python run.py 100 astar` |
+| **Neon Cyberpunk Theme** | `.\maze 20 -t neon` | `python run.py 20 -t neon` |
+| **Export Animated GIF** | `.\maze 10 --export-gif` | `python run.py 10 --export-gif` |
+| **Generate a fresh 35x35 maze** | `.\maze -g --maze-size 35` | `python run.py -g --maze-size 35` |
+
+---
+
 ## 📖 Overview
 
 **MAZESolver 2.0** is an academic Artificial Intelligence laboratory demonstration comparing **Uninformed (Blind)** and **Informed (Heuristic)** search algorithms on 2D grid mazes.
@@ -28,79 +46,45 @@
 
 ---
 
-## ✨ Features (v2.0 Upgrade)
+## 📁 Included Mazes (`data/`)
+
+Pre-generated, guaranteed-solvable mazes ready to run:
+
+- `maze_5x5.txt`
+- `maze_10x10.txt`
+- `maze_20x20.txt`
+- `maze_30x30.txt`
+- `maze_40x40.txt`
+- `maze_50x50.txt`
+- `maze_60x60.txt`
+- `maze_70x70.txt`
+- `maze_80x80.txt`
+- `maze_90x90.txt`
+- `maze_100x100.txt` *(Stress Test: 10,000+ cells)*
+
+You can pass just the number to any command (e.g. `.\maze 40` or `.\maze 100`).
+
+---
+
+## ✨ Features (v2.0)
 
 - 🌈 **Exploration Heatmap Gradient:** Cells transition smoothly from cold blue to hot orange/magenta based on exploration order.
 - 🎨 **4 Dynamic Color Themes:** Switch on-the-fly (`T` key) between `Dark`, `Neon`, `Retro CRT`, and `Light`.
 - 📊 **Multi-Tab HUD:** Press `1` (Live Performance Stats & Coverage), `2` (Frontier/Stack Inspector), or `3` (Algorithm Explainer).
-- 🖥️ **Split-Screen Comparison View:** Run BFS, DFS, and DLS side-by-side in real-time (`--splitview`).
-- 🏗️ **Procedural Maze Generator:** Infinite solvable mazes via Recursive Backtracking or Randomized Prim's (`--generate`).
-- ✏️ **Interactive Maze Editor:** Click-and-drag drawing canvas with undo history and instant solve previews (`--edit`).
+- 🖥️ **Split-Screen Comparison View:** Run BFS, DFS, and DLS side-by-side in real-time (`.\maze -s`).
+- 🏗️ **Procedural Maze Generator:** Infinite solvable mazes via Recursive Backtracking or Randomized Prim's (`.\maze -g`).
+- ✏️ **Interactive Maze Editor:** Click-and-drag drawing canvas with undo history and instant solve previews (`.\maze -e`).
 - 🎆 **Particle Burst System:** Celebratory physics particles when the solution reaches the goal.
 - 🎞️ **Animated GIF Export:** Encode headless runs directly into looping GIFs (`--export-gif` or `G` key).
 - 🔊 **Sound Effects:** Exploration tick frequency and goal fanfare chords (mute with `M`).
 
 ---
 
-## 📁 Directory Structure
+## 📊 Sample Output (`.\maze -c`)
 
 ```
-MAZESolver/
-├── src/
-│   ├── main.py                   # CLI runner & coordinator
-│   ├── config.py                 # Configuration manager
-│   ├── maze.py                   # Grid parsing & topology validation
-│   ├── node.py                   # Search node with parent backtracking
-│   ├── algorithms/
-│   │   ├── base_solver.py        # Abstract solver contract
-│   │   ├── bfs.py                # Breadth-First Search
-│   │   ├── dfs.py                # Depth-First Search
-│   │   ├── dls.py                # Depth-Limited Search
-│   │   ├── iddfs.py              # Iterative Deepening DFS
-│   │   └── astar.py              # A* Search with Manhattan distance
-│   ├── generator/
-│   │   ├── recursive_backtrack.py# Winding corridor generator
-│   │   ├── prims.py              # Branching corridor generator
-│   │   └── generator_cli.py      # Standalone generator tool
-│   ├── editor/
-│   │   └── maze_editor.py        # Interactive GUI maze designer
-│   └── visualization/
-│       ├── renderer.py           # Advanced Pygame visualizer
-│       ├── split_view.py         # Side-by-side comparison engine
-│       ├── hud.py                # 3-tab live HUD display
-│       ├── themes.py             # Dark / Neon / Retro / Light palettes
-│       ├── particles.py          # Particle effects engine
-│       ├── sound_manager.py      # Audio feedback
-│       └── gif_exporter.py       # Pillow animated GIF encoder
-├── data/                         # Sample and generated mazes
-├── tests/                        # 47 automated unit tests
-├── docs/                         # Specifications & planning docs
-├── config.json                   # User customizable settings
-└── requirements.txt
-```
+Running 5-Algorithm Comparison on 'maze_20x20.txt'...
 
----
-
-## ⚡ Quick Start
-
-### 1. Installation
-```powershell
-git clone https://github.com/HaxOrWot/MAZESolver.git
-cd MAZESolver
-pip install -r requirements.txt
-```
-
-### 2. Run Single Algorithm with Visualization
-```powershell
-python src/main.py --maze data/maze_20x20.txt --algo astar --visual
-```
-
-### 3. Compare All 5 Algorithms (CLI Table)
-```powershell
-python src/main.py --maze data/maze_20x20.txt --compare
-```
-*Output Table:*
-```
 ╔════════════════╦═════════╦════════════════╦══════════════╦══════════════╗
 ║  Algorithm     ║  Found? ║ Nodes Explored ║ Path Length  ║  Time (ms)   ║
 ╠════════════════╬═════════╬════════════════╬══════════════╬══════════════╣
@@ -112,35 +96,9 @@ python src/main.py --maze data/maze_20x20.txt --compare
 ╚════════════════╩═════════╩════════════════╩══════════════╩══════════════╝
 ```
 
-### 4. Split-Screen Synchronized View
-```powershell
-python src/main.py --maze data/maze_20x20.txt --splitview --theme neon
-```
-
-### 5. Generate and Solve a Random Maze
-```powershell
-python src/main.py --generate --maze-size 25 --algo bfs --visual
-```
-
-### 6. Interactive Maze Editor
-```powershell
-python src/main.py --edit
-```
-- **Left Click / Drag:** Draw or toggle walls
-- **Right Click:** Cycle Start (`S`) or Goal (`G`)
-- **`B` / `D` / `A`:** Preview BFS, DFS, or A* solution overlay
-- **`Ctrl+S`:** Save custom maze to file
-- **`Ctrl+G`:** Generate procedural maze
-
-### 7. Export Animated GIF
-```powershell
-python src/main.py --maze data/maze_20x20.txt --algo astar --export-gif
-```
-*Outputs looping GIF to `output/gifs/`.*
-
 ---
 
-## 🎮 Visualizer Keyboard Controls
+## 🎮 Visualizer In-Window Controls
 
 | Key | Action |
 |-----|--------|
@@ -158,9 +116,9 @@ python src/main.py --maze data/maze_20x20.txt --algo astar --export-gif
 
 ---
 
-## 🧪 Testing
+## 🧪 Running Tests
 
-Run all 47 tests with coverage:
+Run all 47 tests:
 ```powershell
 pytest tests/ -v
 ```

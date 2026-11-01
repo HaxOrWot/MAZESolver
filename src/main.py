@@ -139,33 +139,65 @@ def print_comparison(results: List[Dict[str, Any]], algo_names: List[str]) -> No
     print(bot_border + "\n")
 
 
+def resolve_maze_path(maze_arg: str) -> str:
+    """Intelligently resolves maze argument (e.g. '20' -> 'data/maze_20x20.txt')."""
+    if not maze_arg:
+        default_path = os.path.join(PROJECT_ROOT, "data", "maze_20x20.txt")
+        return default_path if os.path.exists(default_path) else "data/maze_5x5.txt"
+
+    # Direct path
+    if os.path.exists(maze_arg):
+        return maze_arg
+
+    # Direct in data/
+    in_data = os.path.join(PROJECT_ROOT, "data", maze_arg)
+    if os.path.exists(in_data):
+        return in_data
+
+    # Shorthand number: '20' or '20x20' -> 'data/maze_20x20.txt'
+    clean_num = maze_arg.lower().replace(".txt", "").replace("maze_", "")
+    if "x" in clean_num:
+        cand = os.path.join(PROJECT_ROOT, "data", f"maze_{clean_num}.txt")
+    else:
+        cand = os.path.join(PROJECT_ROOT, "data", f"maze_{clean_num}x{clean_num}.txt")
+
+    if os.path.exists(cand):
+        return cand
+
+    return maze_arg
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="MAZESolver 2.0 — Uninformed and Informed Search Suite"
+        description="MAZESolver — Uninformed and Informed Searches"
     )
-    parser.add_argument("--maze", help="Path to maze .txt file")
+    parser.add_argument("-m", "--maze", help="Path or shorthand size for maze (e.g. '20', '100', 'data/maze_20x20.txt')")
     parser.add_argument(
+        "-a",
         "--algo",
         choices=["bfs", "dfs", "dls", "iddfs", "astar"],
         help="Algorithm: bfs, dfs, dls, iddfs, or astar",
     )
     parser.add_argument(
-        "--visual", action="store_true", help="Launch interactive visual animation"
+        "-v", "--visual", action="store_true", help="Launch interactive visual animation"
     )
     parser.add_argument(
-        "--limit", type=int, help="Depth limit for DLS (default: rows + cols)"
+        "-l", "--limit", type=int, help="Depth limit for DLS (default: rows + cols)"
     )
     parser.add_argument(
+        "-c",
         "--compare",
         action="store_true",
         help="Run 5 algorithms side-by-side (BFS, DFS, DLS, IDDFS, A*)",
     )
     parser.add_argument(
+        "-s",
         "--splitview",
         action="store_true",
         help="Open 3-panel synchronized comparison window (BFS, DFS, DLS)",
     )
     parser.add_argument(
+        "-t",
         "--theme",
         choices=["dark", "neon", "retro", "light"],
         default=None,
@@ -175,7 +207,7 @@ def main() -> None:
         "--export-gif", action="store_true", help="Capture and save animated GIF"
     )
     parser.add_argument(
-        "--generate", action="store_true", help="Procedurally generate a maze first"
+        "-g", "--generate", action="store_true", help="Procedurally generate a maze first"
     )
     parser.add_argument(
         "--maze-size", type=int, default=21, help="Dimension NxN for generated maze (default: 21)"
@@ -187,7 +219,7 @@ def main() -> None:
         help="Generation algorithm (default: recursive_backtrack)",
     )
     parser.add_argument(
-        "--edit", action="store_true", help="Open the interactive maze editor"
+        "-e", "--edit", action="store_true", help="Open the interactive maze editor"
     )
 
     args = parser.parse_args()
@@ -216,8 +248,8 @@ def main() -> None:
         args.maze = gen_file
         print(f"[Generate] Generated solvable maze -> {args.maze}")
 
-    if not args.maze:
-        parser.error("You must specify a maze file via --maze, or use --generate, or use --edit")
+    # Resolve maze shorthand if given, or fallback to default 20x20
+    args.maze = resolve_maze_path(args.maze)
 
     if not os.path.exists(args.maze):
         print(f"Error: Maze file '{args.maze}' not found.")
@@ -260,9 +292,10 @@ def main() -> None:
             append_to_log(name, args.maze, res)
         return
 
-    # 5. Single Algorithm Execution
+    # Default to visual BFS if no specific action specified
     if not args.algo:
-        parser.error("Must specify --algo [bfs|dfs|dls|iddfs|astar], or --compare, or --splitview")
+        args.algo = "bfs"
+        args.visual = True
 
     algo_name = args.algo.lower()
     if algo_name == "bfs":
