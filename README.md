@@ -1,4 +1,4 @@
-# 🧩 MAZESolver 2.0 — Uninformed & Informed AI Search Suite
+# 🧩 MAZESolver — Uninformed & Informed AI Search Suite
 
 > **AI College Project** | BFS · DFS · DLS · IDDFS · A* (Heuristic)  
 > **Language:** Python 3.10+ | **Visualization:** Pygame & Pillow | **Desktop:** Standalone Windows EXE
@@ -89,7 +89,7 @@ python src/App/build_exe.py
 
 ## 📖 Overview
 
-**MAZESolver 2.0** is an academic Artificial Intelligence laboratory demonstration comparing **Uninformed (Blind)** and **Informed (Heuristic)** search algorithms on 2D grid mazes.
+**MAZESolver** is an academic Artificial Intelligence laboratory demonstration comparing **Uninformed (Blind)** and **Informed (Heuristic)** search algorithms on 2D grid mazes.
 
 ### 🤖 Supported Algorithms
 
