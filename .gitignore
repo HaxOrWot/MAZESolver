@@ -19,6 +19,13 @@ venv/
 .coverage
 htmlcov/
 
+# PyInstaller
+*.spec
+src/App/build/
+src/App/dist/
+src/App/*.exe
+*.exe
+
 # Output (auto-generated, don't commit)
 output/
 data/generated/

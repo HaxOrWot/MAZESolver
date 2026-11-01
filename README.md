@@ -1,7 +1,7 @@
 # 🧩 MAZESolver 2.0 — Uninformed & Informed AI Search Suite
 
 > **AI College Project** | BFS · DFS · DLS · IDDFS · A* (Heuristic)  
-> **Language:** Python 3.10+ | **Visualization:** Pygame & Pillow
+> **Language:** Python 3.10+ | **Visualization:** Pygame & Pillow | **Desktop:** Standalone Windows EXE
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![Pygame](https://img.shields.io/badge/Pygame-2.6+-green)
@@ -25,6 +25,65 @@ No need to write long paths or complex arguments! Use `.\maze` (PowerShell/CMD) 
 | **Neon Cyberpunk Theme** | `.\maze 20 -t neon` | `python run.py 20 -t neon` |
 | **Export Animated GIF** | `.\maze 10 --export-gif` | `python run.py 10 --export-gif` |
 | **Generate a fresh 35x35 maze** | `.\maze -g --maze-size 35` | `python run.py -g --maze-size 35` |
+
+---
+
+## 🔤 Short Flags Reference
+
+You can combine short forms freely:
+
+| Short Flag | Long Form | Meaning & Examples |
+|---|---|---|
+| `-m` | `--maze` | Path or number: `-m 50` or `-m data/maze_50x50.txt` |
+| `-a` | `--algo` | Algorithm: `bfs`, `dfs`, `dls`, `iddfs`, `astar` |
+| `-v` | `--visual` | Open the animated visualization window |
+| `-c` | `--compare` | Run side-by-side comparison table of all 5 algorithms |
+| `-s` | `--splitview`| Run BFS, DFS, and DLS simultaneously in 3 split panels |
+| `-e` | `--edit` | Open the interactive Pygame maze designer |
+| `-t` | `--theme` | Visual theme: `dark`, `neon`, `retro`, `light` |
+| `-g` | `--generate` | Procedurally generate a new maze before solving |
+| `-l` | `--limit` | Custom depth cutoff limit for DLS (e.g. `-l 30`) |
+
+### Examples with Short Flags:
+```powershell
+python src/main.py -m 50 -a astar -v
+python src/main.py -m 100 -c
+python src/main.py -m 30 -s -t neon
+python src/main.py -e
+```
+
+---
+
+## 💻 Standalone Desktop Executable (`MAZESolver.exe`)
+
+You can run **MAZESolver** as a standalone native Windows desktop application with **no Python installation required**!
+
+The application is located in:
+```
+src\App\MAZESolver.exe
+```
+
+### 1. Interactive Desktop GUI Mode (Double-Click)
+Simply **double-click `MAZESolver.exe`** in Windows Explorer. It launches the **Desktop Launcher Hub**:
+- Click to pick any maze size (10×10 up to 100×100 or Generate New)
+- Click to choose search algorithm (BFS, DFS, DLS, IDDFS, A*)
+- Click to toggle visual themes (Dark, Neon, Retro, Light)
+- Choose mode: **Start Visualizer**, **Split-Screen**, **Compare Table**, or **Maze Editor**
+- Hit **🚀 LAUNCH**!
+
+### 2. Command-Line Mode via EXE
+`MAZESolver.exe` also accepts all command-line arguments:
+```powershell
+.\src\App\MAZESolver.exe -c
+.\src\App\MAZESolver.exe 50 astar -v
+.\src\App\MAZESolver.exe -s
+```
+
+### 3. Rebuilding the Executable
+If you modify any source code, rebuild the EXE with one command:
+```powershell
+python src/App/build_exe.py
+```
 
 ---
 
@@ -80,7 +139,7 @@ You can pass just the number to any command (e.g. `.\maze 40` or `.\maze 100`).
 
 ---
 
-## 📊 Sample Output (`.\maze -c`)
+## 📊 Sample Comparison Output (`.\maze -c`)
 
 ```
 Running 5-Algorithm Comparison on 'maze_20x20.txt'...
