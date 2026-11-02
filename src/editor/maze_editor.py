@@ -43,6 +43,12 @@ class MazeEditor:
         self.offset_y = self.TOOLBAR_HEIGHT + 16 + (avail_h - self.canvas_h) // 2
 
         pygame.display.set_caption("MAZESolver — Interactive Maze Editor")
+        try:
+            icon_p = os.path.join(PROJECT_ROOT, "assets", "icons", "app_icon.png")
+            if os.path.exists(icon_p):
+                pygame.display.set_icon(pygame.image.load(icon_p))
+        except Exception:
+            pass
         self.screen = pygame.display.set_mode((self.window_w, self.window_h))
         self.clock = pygame.time.Clock()
 

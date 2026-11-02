@@ -46,10 +46,11 @@ class SplitPanel:
                 self.status = "REVEALING_PATH" if self.found else "NO PATH"
 
         elif self.status == "REVEALING_PATH":
-            if self.path_reveal_step < len(self.solution_path):
-                self.path_reveal_step += max(1, steps // 2)
-            else:
-                self.path_reveal_step = len(self.solution_path)
+            self.path_reveal_step = min(
+                len(self.solution_path),
+                self.path_reveal_step + max(1, steps // 2),
+            )
+            if self.path_reveal_step >= len(self.solution_path):
                 self.status = "SOLVED"
 
     def draw(self, screen, font_title, font_stats):
@@ -136,6 +137,13 @@ class SplitRenderer:
         ]
 
         pygame.display.set_caption("MAZESolver 2.0 — Split View Comparison")
+        try:
+            root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            icon_p = os.path.join(root, "assets", "icons", "app_icon.png")
+            if os.path.exists(icon_p):
+                pygame.display.set_icon(pygame.image.load(icon_p))
+        except Exception:
+            pass
         self.screen = pygame.display.set_mode((self.window_w, self.window_h))
         self.clock = pygame.time.Clock()
 

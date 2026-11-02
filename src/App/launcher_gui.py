@@ -84,6 +84,12 @@ class LauncherGUI:
         pygame.init()
         self.window_w = 900
         self.window_h = 640
+        try:
+            icon_p = os.path.join(PROJECT_ROOT, "assets", "icons", "app_icon.png")
+            if os.path.exists(icon_p):
+                pygame.display.set_icon(pygame.image.load(icon_p))
+        except Exception:
+            pass
         self.screen = pygame.display.set_mode((self.window_w, self.window_h))
         pygame.display.set_caption("MAZESolver 2.0 — Control Center")
         self.clock = pygame.time.Clock()

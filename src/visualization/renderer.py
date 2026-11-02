@@ -57,6 +57,13 @@ class Renderer:
         self.offset_y = pad_y + (avail_h - self.maze_height) // 2
 
         pygame.display.set_caption(f"MAZESolver 2.0 — {algo_name}")
+        try:
+            root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            icon_p = os.path.join(root, "assets", "icons", "app_icon.png")
+            if os.path.exists(icon_p):
+                pygame.display.set_icon(pygame.image.load(icon_p))
+        except Exception:
+            pass
         self.screen = pygame.display.set_mode((self.window_width, self.window_height))
         self.clock = pygame.time.Clock()
 
@@ -130,9 +137,9 @@ class Renderer:
 
     def draw_cell(self, pos, color, size_offset=0):
         r, c = pos
-        x = self.offset_x + c * self.cell_size - size_offset // 2
-        y = self.offset_y + r * self.cell_size - size_offset // 2
-        sz = self.cell_size + size_offset
+        sz = max(1, self.cell_size + size_offset)
+        x = self.offset_x + c * self.cell_size - (sz - self.cell_size) // 2
+        y = self.offset_y + r * self.cell_size - (sz - self.cell_size) // 2
         rect = pygame.Rect(x, y, sz, sz)
         pygame.draw.rect(self.screen, color, rect)
         if self.cell_size > 7 and size_offset == 0:
@@ -158,9 +165,8 @@ class Renderer:
                     self.draw_cell(pos, self.theme["goal"], size_offset=pulse)
                 elif pos in revealed_path_set:
                     is_head = (
-                        self.path_reveal_step > 0
+                        0 < self.path_reveal_step < len(self.solution_path)
                         and pos == self.solution_path[self.path_reveal_step - 1]
-                        and self.path_reveal_step < len(self.solution_path)
                     )
                     path_color = (255, 255, 255) if is_head else self.theme["path"]
                     self.draw_cell(pos, path_color)
@@ -309,10 +315,11 @@ class Renderer:
                             self.status = "NO PATH"
 
                 elif self.status == "REVEALING_PATH":
-                    if self.path_reveal_step < len(self.solution_path):
-                        self.path_reveal_step += max(1, self.steps_per_frame // 2)
-                    else:
-                        self.path_reveal_step = len(self.solution_path)
+                    self.path_reveal_step = min(
+                        len(self.solution_path),
+                        self.path_reveal_step + max(1, self.steps_per_frame // 2),
+                    )
+                    if self.path_reveal_step >= len(self.solution_path):
                         self.status = "SOLVED"
                         self.trigger_goal_burst()
 
