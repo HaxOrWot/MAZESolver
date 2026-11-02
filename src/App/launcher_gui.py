@@ -579,18 +579,21 @@ class LauncherGUI:
             return
 
         # Visual mode
-        algo_map = {
-            "bfs": (BFSSolver, "BFS", None),
-            "dfs": (DFSSolver, "DFS", None),
-            "dls": (DLSSolver, f"DLS (L={self.dls_limit})", self.dls_limit),
-            "iddfs": (IDDFSSolver, "IDDFS", None),
-            "astar": (AStarSolver, "A*", None),
-        }
-        cls, name, param = algo_map.get(self.selected_algo, (BFSSolver, "BFS", None))
-        if param is not None:
-            solver = cls(maze, limit=param)
+        if self.selected_algo == "dls":
+            solver = DLSSolver(maze, limit=self.dls_limit)
+            name = f"DLS (L={self.dls_limit})"
+        elif self.selected_algo == "dfs":
+            solver = DFSSolver(maze)
+            name = "DFS"
+        elif self.selected_algo == "iddfs":
+            solver = IDDFSSolver(maze)
+            name = "IDDFS"
+        elif self.selected_algo == "astar":
+            solver = AStarSolver(maze)
+            name = "A*"
         else:
-            solver = cls(maze)
+            solver = BFSSolver(maze)
+            name = "BFS"
 
         res = solver.solve()
         self.status_msg = f"Solved {os.path.basename(maze_path)}: Path={res['path_length']} steps | Explored={res['nodes_explored']} nodes ({res['time_taken']*1000:.2f}ms)"
