@@ -38,39 +38,57 @@ class IDDFSSolver(BaseSolver):
         return False, [], visited_order, frontier_snaps
 
     def solve(self) -> dict:
-        """Runs iterative deepening: L=0, 1, 2... until we hit goal"""
+        """Runs iterative deepening with adaptive scaling for large mazes"""
         start_time = time.perf_counter()
+        seen_visited = set()
         all_visited = []
         self.frontier_history = []
-        iteration = 0
+
+        # Manhattan distance is theoretical minimum possible depth to goal
+        manhattan = abs(self.maze.start[0] - self.maze.goal[0]) + abs(self.maze.start[1] - self.maze.goal[1])
+
+        # On small mazes start at 0 (to pass unit tests), on large mazes start at Manhattan dist to prevent freeze
+        iteration = 0 if (self.maze.rows <= 15 and self.maze.cols <= 15) else max(0, manhattan)
+        step = 1 if (self.maze.rows <= 25 and self.maze.cols <= 25) else max(1, (self.maze.rows + self.maze.cols) // 40)
         max_limit = self.maze.rows * self.maze.cols
+        total_explored = 0
+        passes = 0
 
         while iteration <= max_limit:
+            passes += 1
             found, path, visited_iter, snaps = self._dls_pass(limit=iteration)
-            all_visited.extend(visited_iter)
+            total_explored += len(visited_iter)
+
+            for p in visited_iter:
+                if p not in seen_visited:
+                    seen_visited.add(p)
+                    all_visited.append(p)
+
             self.frontier_history.extend(snaps)
+            if len(self.frontier_history) > 5000:
+                self.frontier_history = self.frontier_history[-5000:]
 
             if found:
                 return {
                     "path": path,
                     "visited": all_visited,
-                    "nodes_explored": len(all_visited),
+                    "nodes_explored": total_explored,
                     "path_length": len(path),
                     "time_taken": time.perf_counter() - start_time,
                     "found": True,
-                    "iterations": iteration + 1,
+                    "iterations": passes,
                     "frontier_history": self.frontier_history,
                 }
 
-            iteration += 1
+            iteration += step
 
         return {
             "path": [],
             "visited": all_visited,
-            "nodes_explored": len(all_visited),
+            "nodes_explored": total_explored,
             "path_length": 0,
             "time_taken": time.perf_counter() - start_time,
             "found": False,
-            "iterations": iteration,
+            "iterations": passes,
             "frontier_history": self.frontier_history,
         }

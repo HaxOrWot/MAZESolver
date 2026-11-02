@@ -42,7 +42,6 @@ class CardButton:
         self.is_hovered = False
 
     def draw(self, screen, font_title, font_sub, is_selected, palette):
-        # determine background and border
         if is_selected:
             bg_col = palette["btn_sel_bg"]
             border_col = palette["accent"]
@@ -62,7 +61,6 @@ class CardButton:
         pygame.draw.rect(screen, bg_col, self.rect, border_radius=6)
         pygame.draw.rect(screen, border_col, self.rect, 1 if not is_selected else 2, border_radius=6)
 
-        # optional indicator dot
         offset_x = 10
         if self.dot_color:
             dot_y = self.rect.y + self.rect.height // 2
@@ -71,13 +69,11 @@ class CardButton:
 
         avail_w = self.rect.width - offset_x - 8
         if self.subtitle:
-            # title + subtitle layout
             t_surf = render_fitted_text(font_title, self.title, avail_w, title_col)
             s_surf = render_fitted_text(font_sub, self.subtitle, avail_w, sub_col)
             screen.blit(t_surf, (self.rect.x + offset_x, self.rect.y + 7))
             screen.blit(s_surf, (self.rect.x + offset_x, self.rect.y + 25))
         else:
-            # single centered title
             t_surf = render_fitted_text(font_title, self.title, avail_w, title_col)
             tx = self.rect.x + (self.rect.width - t_surf.get_width()) // 2
             ty = self.rect.y + (self.rect.height - t_surf.get_height()) // 2
@@ -92,7 +88,6 @@ class LauncherGUI:
         pygame.display.set_caption("MAZESolver 2.0 — Control Center")
         self.clock = pygame.time.Clock()
 
-        # modern palette
         self.palette = {
             "bg": (13, 17, 23),
             "card_bg": (22, 27, 34),
@@ -114,7 +109,30 @@ class LauncherGUI:
             "action_hover": (46, 160, 67),
         }
 
-        # fonts
+        self._init_fonts()
+
+        # runtime state
+        self.selected_mode = "visual"
+        self.selected_maze = "maze_20x20.txt"
+        self.selected_algo = "bfs"
+        self.selected_theme = "neon"
+        self.anim_speed = 3
+        self.sound_enabled = True
+        self.dls_limit = 40
+        self.gen_algo = "recursive_backtrack"
+        self.gen_size = 25
+        self.status_msg = "Ready. Configure parameters and launch."
+
+        # cache for preview maze thumbnail
+        self.cached_maze_path = None
+        self.cached_maze_obj = None
+        self.cached_preview_surf = None
+
+        self.buttons = []
+        self._init_layout()
+        self._update_preview()
+
+    def _init_fonts(self):
         pygame.font.init()
         def get_best_font(size, bold=False):
             for name in ["segoeui", "arial", "consolas"]:
@@ -131,27 +149,6 @@ class LauncherGUI:
         self.font_small = get_best_font(10, bold=False)
         self.font_action = get_best_font(14, bold=True)
         self.font_mono = pygame.font.SysFont("consolas", 11)
-
-        # state
-        self.selected_mode = "visual"   # visual, split, compare, edit
-        self.selected_maze = "maze_20x20.txt"
-        self.selected_algo = "bfs"
-        self.selected_theme = "neon"
-        self.anim_speed = 3
-        self.sound_enabled = True
-        self.dls_limit = 40
-        self.gen_algo = "recursive_backtrack"
-        self.gen_size = 25
-        self.status_msg = "Ready. Configure parameters and launch."
-
-        # cache for preview maze
-        self.cached_maze_path = None
-        self.cached_maze_obj = None
-        self.cached_preview_surf = None
-
-        self.buttons = []
-        self._init_layout()
-        self._update_preview()
 
     def _init_layout(self):
         self.buttons.clear()
@@ -226,9 +223,9 @@ class LauncherGUI:
 
         # Generator & DLS stepper buttons
         param_y = 445
-        self.btn_dls_minus = CardButton((start_x + 130, param_y, 36, 26), "-", "", group="dls", tag="minus")
-        self.btn_dls_plus = CardButton((start_x + 220, param_y, 36, 26), "+", "", group="dls", tag="plus")
-        self.btn_gen_toggle = CardButton((start_x + 360, param_y, 184, 26), "Gen: Backtracking", "", group="gen_algo", tag="toggle")
+        self.btn_dls_minus = CardButton((start_x + 126, param_y, 30, 26), "-", "", group="dls", tag="minus")
+        self.btn_dls_plus = CardButton((start_x + 204, param_y, 30, 26), "+", "", group="dls", tag="plus")
+        self.btn_gen_toggle = CardButton((start_x + 336, param_y, 208, 26), "Gen: Backtracking", "", group="gen_algo", tag="toggle")
 
         self.buttons.extend([self.btn_dls_minus, self.btn_dls_plus, self.btn_gen_toggle])
 
@@ -291,6 +288,12 @@ class LauncherGUI:
         except Exception:
             self.cached_preview_surf = None
 
+    def _restore_display(self):
+        self.screen = pygame.display.set_mode((self.window_w, self.window_h))
+        pygame.display.set_caption("MAZESolver 2.0 — Control Center")
+        self._init_fonts()
+        self._update_preview()
+
     def run(self):
         running = True
         while running:
@@ -311,7 +314,6 @@ class LauncherGUI:
                         self._execute_action()
 
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    # check button clicks
                     for btn in self.buttons:
                         if btn.rect.collidepoint(event.pos):
                             if btn.group == "mode":
@@ -340,7 +342,6 @@ class LauncherGUI:
                                 if self.selected_maze == "GENERATE":
                                     self._update_preview()
 
-                    # action button clicked
                     if self.action_rect.collidepoint(event.pos):
                         self._execute_action()
 
@@ -364,7 +365,6 @@ class LauncherGUI:
             sub_txt = self.font_body.render("AI Search Studio & Benchmark Environment", True, self.palette["text_muted"])
             self.screen.blit(sub_txt, (224, 20))
 
-            # ready pill right-aligned
             pill_rect = pygame.Rect(self.window_w - 180, 15, 156, 24)
             pygame.draw.rect(self.screen, self.palette["card_inner"], pill_rect, border_radius=12)
             pygame.draw.rect(self.screen, self.palette["border"], pill_rect, 1, border_radius=12)
@@ -396,7 +396,7 @@ class LauncherGUI:
             dls_label = self.font_body.render("DLS Depth Limit:", True, self.palette["text_muted"])
             self.screen.blit(dls_label, (24, 450))
             val_dls = self.font_mono.render(f"{self.dls_limit:3d}", True, self.palette["accent_text"])
-            self.screen.blit(val_dls, (182, 450))
+            self.screen.blit(val_dls, (24 + 162, 450))
 
             # Draw buttons
             for btn in self.buttons:
@@ -428,7 +428,6 @@ class LauncherGUI:
             insp_head = self.font_h2.render("GRID & ALGORITHM INSPECTOR", True, self.palette["accent"])
             self.screen.blit(insp_head, (card_x + 14, card_y + 12))
 
-            # preview canvas container
             pv_box = pygame.Rect(card_x + 14, card_y + 34, card_w - 28, 178)
             pygame.draw.rect(self.screen, self.palette["card_inner"], pv_box, border_radius=6)
             pygame.draw.rect(self.screen, self.palette["border"], pv_box, 1, border_radius=6)
@@ -455,7 +454,6 @@ class LauncherGUI:
                     self.screen.blit(v_surf, (card_x + 110, cur_y))
                     cur_y += 20
 
-            # Algorithm properties brief
             pygame.draw.line(self.screen, self.palette["border"], (card_x + 14, cur_y + 4), (card_x + card_w - 14, cur_y + 4), 1)
             cur_y += 12
 
@@ -486,7 +484,6 @@ class LauncherGUI:
             pygame.draw.rect(self.screen, self.palette["card_bg"], footer_rect)
             pygame.draw.line(self.screen, self.palette["border"], (0, self.window_h - 70), (self.window_w, self.window_h - 70), 1)
 
-            # status message on left with auto-fitted text so it never goes out of bounds
             stat_lbl = self.font_small.render("STATUS", True, self.palette["accent"])
             self.screen.blit(stat_lbl, (24, self.window_h - 52))
 
@@ -515,93 +512,91 @@ class LauncherGUI:
         pygame.quit()
 
     def _execute_action(self):
-        # apply runtime config overrides before launching
-        cfg = Config.get()
-        cfg.set("sound_enabled", self.sound_enabled)
-        cfg.set("steps_per_frame", self.anim_speed)
+        try:
+            cfg = Config.get()
+            cfg.set("sound_enabled", self.sound_enabled)
+            cfg.set("steps_per_frame", self.anim_speed)
 
-        # resolve maze path
-        if self.selected_maze == "GENERATE":
-            gen_dir = os.path.join(PROJECT_ROOT, "data", "generated")
-            os.makedirs(gen_dir, exist_ok=True)
-            gen_file = os.path.join(gen_dir, f"procedural_{self.gen_algo}_{self.gen_size}x{self.gen_size}.txt")
-            if self.gen_algo == "prims":
-                gen = PrimsGenerator(self.gen_size, self.gen_size)
+            # resolve maze path
+            if self.selected_maze == "GENERATE":
+                gen_dir = os.path.join(PROJECT_ROOT, "data", "generated")
+                os.makedirs(gen_dir, exist_ok=True)
+                gen_file = os.path.join(gen_dir, f"procedural_{self.gen_algo}_{self.gen_size}x{self.gen_size}.txt")
+                if self.gen_algo == "prims":
+                    gen = PrimsGenerator(self.gen_size, self.gen_size)
+                else:
+                    gen = RecursiveBacktrackGenerator(self.gen_size, self.gen_size)
+                gen.generate()
+                gen.save(gen_file)
+                maze_path = gen_file
             else:
-                gen = RecursiveBacktrackGenerator(self.gen_size, self.gen_size)
-            gen.generate()
-            gen.save(gen_file)
-            maze_path = gen_file
-        else:
-            maze_path = os.path.join(PROJECT_ROOT, "data", self.selected_maze)
-            if not os.path.exists(maze_path):
-                maze_path = os.path.join(PROJECT_ROOT, "data", "maze_20x20.txt")
+                maze_path = os.path.join(PROJECT_ROOT, "data", self.selected_maze)
+                if not os.path.exists(maze_path):
+                    maze_path = os.path.join(PROJECT_ROOT, "data", "maze_20x20.txt")
 
-        maze = Maze(maze_path)
+            maze = Maze(maze_path)
 
-        if self.selected_mode == "edit":
-            editor = MazeEditor(rows=maze.rows, cols=maze.cols, theme_name=self.selected_theme)
-            editor.run()
-            # restore launcher window after editor closes
-            self.screen = pygame.display.set_mode((self.window_w, self.window_h))
-            pygame.display.set_caption("MAZESolver 2.0 — Control Center")
-            self._update_preview()
-            return
+            if self.selected_mode == "edit":
+                editor = MazeEditor(rows=maze.rows, cols=maze.cols, theme_name=self.selected_theme)
+                editor.run()
+                self._restore_display()
+                return
 
-        if self.selected_mode == "split":
-            bfs_res = BFSSolver(maze).solve()
-            dfs_res = DFSSolver(maze).solve()
-            dls_res = DLSSolver(maze, limit=self.dls_limit).solve()
-            renderer = SplitRenderer(
-                maze,
-                {"bfs": bfs_res, "dfs": dfs_res, "dls": dls_res},
-                theme_name=self.selected_theme,
-            )
+            if self.selected_mode == "split":
+                bfs_res = BFSSolver(maze).solve()
+                dfs_res = DFSSolver(maze).solve()
+                dls_res = DLSSolver(maze, limit=self.dls_limit).solve()
+                renderer = SplitRenderer(
+                    maze,
+                    {"bfs": bfs_res, "dfs": dfs_res, "dls": dls_res},
+                    theme_name=self.selected_theme,
+                )
+                renderer.run()
+                self._restore_display()
+                return
+
+            if self.selected_mode == "compare":
+                from src.main import print_comparison, append_to_log
+                bfs_res = BFSSolver(maze).solve()
+                dfs_res = DFSSolver(maze).solve()
+                dls_res = DLSSolver(maze, limit=self.dls_limit).solve()
+                iddfs_res = IDDFSSolver(maze).solve()
+                astar_res = AStarSolver(maze).solve()
+
+                algo_names = ["BFS", "DFS", f"DLS (L={self.dls_limit})", "IDDFS", "A* (Heuristic)"]
+                results = [bfs_res, dfs_res, dls_res, iddfs_res, astar_res]
+                print_comparison(results, algo_names)
+                for n, r in zip(algo_names, results):
+                    append_to_log(n, maze_path, r)
+                self.status_msg = f"Benchmark complete! Metrics logged to output/results_log.txt"
+                return
+
+            # Visual mode
+            if self.selected_algo == "dls":
+                solver = DLSSolver(maze, limit=self.dls_limit)
+                name = f"DLS (L={self.dls_limit})"
+            elif self.selected_algo == "dfs":
+                solver = DFSSolver(maze)
+                name = "DFS"
+            elif self.selected_algo == "iddfs":
+                solver = IDDFSSolver(maze)
+                name = "IDDFS"
+            elif self.selected_algo == "astar":
+                solver = AStarSolver(maze)
+                name = "A*"
+            else:
+                solver = BFSSolver(maze)
+                name = "BFS"
+
+            res = solver.solve()
+            self.status_msg = f"Solved {os.path.basename(maze_path)}: Path={res['path_length']} steps | Explored={res['nodes_explored']} nodes ({res['time_taken']*1000:.2f}ms)"
+
+            renderer = Renderer(maze, res, name, theme_name=self.selected_theme)
             renderer.run()
-            self.screen = pygame.display.set_mode((self.window_w, self.window_h))
-            pygame.display.set_caption("MAZESolver 2.0 — Control Center")
-            return
-
-        if self.selected_mode == "compare":
-            from src.main import print_comparison, append_to_log
-            bfs_res = BFSSolver(maze).solve()
-            dfs_res = DFSSolver(maze).solve()
-            dls_res = DLSSolver(maze, limit=self.dls_limit).solve()
-            iddfs_res = IDDFSSolver(maze).solve()
-            astar_res = AStarSolver(maze).solve()
-
-            algo_names = ["BFS", "DFS", f"DLS (L={self.dls_limit})", "IDDFS", "A* (Heuristic)"]
-            results = [bfs_res, dfs_res, dls_res, iddfs_res, astar_res]
-            print_comparison(results, algo_names)
-            for n, r in zip(algo_names, results):
-                append_to_log(n, maze_path, r)
-            self.status_msg = f"Benchmark complete! Metrics logged to output/results_log.txt"
-            return
-
-        # Visual mode
-        if self.selected_algo == "dls":
-            solver = DLSSolver(maze, limit=self.dls_limit)
-            name = f"DLS (L={self.dls_limit})"
-        elif self.selected_algo == "dfs":
-            solver = DFSSolver(maze)
-            name = "DFS"
-        elif self.selected_algo == "iddfs":
-            solver = IDDFSSolver(maze)
-            name = "IDDFS"
-        elif self.selected_algo == "astar":
-            solver = AStarSolver(maze)
-            name = "A*"
-        else:
-            solver = BFSSolver(maze)
-            name = "BFS"
-
-        res = solver.solve()
-        self.status_msg = f"Solved {os.path.basename(maze_path)}: Path={res['path_length']} steps | Explored={res['nodes_explored']} nodes ({res['time_taken']*1000:.2f}ms)"
-
-        renderer = Renderer(maze, res, name, theme_name=self.selected_theme)
-        renderer.run()
-        self.screen = pygame.display.set_mode((self.window_w, self.window_h))
-        pygame.display.set_caption("MAZESolver 2.0 — Control Center")
+            self._restore_display()
+        except Exception as e:
+            self.status_msg = f"Runtime error: {e}"
+            self._restore_display()
 
 if __name__ == "__main__":
     launcher = LauncherGUI()

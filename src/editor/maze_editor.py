@@ -24,15 +24,23 @@ class MazeEditor:
         pygame.init()
         self.rows = rows if rows % 2 == 1 else rows + 1
         self.cols = cols if cols % 2 == 1 else cols + 1
-        self.cell_size = max(14, min(36, 680 // max(self.rows, self.cols)))
 
         self.theme_name = theme_name
         self.theme = get_theme(theme_name)
 
+        # Standard fixed window size across all maze sizes
+        self.window_w = 960
+        self.window_h = 700
+
+        avail_w = self.window_w - 32
+        avail_h = self.window_h - self.TOOLBAR_HEIGHT - self.STATUSBAR_HEIGHT - 32
+
+        self.cell_size = max(2, min(32, min(avail_w // self.cols, avail_h // self.rows)))
         self.canvas_w = self.cols * self.cell_size
         self.canvas_h = self.rows * self.cell_size
-        self.window_w = max(640, self.canvas_w)
-        self.window_h = self.TOOLBAR_HEIGHT + self.canvas_h + self.STATUSBAR_HEIGHT
+
+        self.offset_x = (self.window_w - self.canvas_w) // 2
+        self.offset_y = self.TOOLBAR_HEIGHT + 16 + (avail_h - self.canvas_h) // 2
 
         pygame.display.set_caption("MAZESolver — Interactive Maze Editor")
         self.screen = pygame.display.set_mode((self.window_w, self.window_h))
@@ -89,10 +97,12 @@ class MazeEditor:
                     self.goal = (r, c)
 
     def _cell_at(self, mx, my):
-        if my < self.TOOLBAR_HEIGHT or my >= self.TOOLBAR_HEIGHT + self.canvas_h:
+        if mx < self.offset_x or mx >= self.offset_x + self.canvas_w:
             return None
-        c = mx // self.cell_size
-        r = (my - self.TOOLBAR_HEIGHT) // self.cell_size
+        if my < self.offset_y or my >= self.offset_y + self.canvas_h:
+            return None
+        c = (mx - self.offset_x) // self.cell_size
+        r = (my - self.offset_y) // self.cell_size
         if 0 <= r < self.rows and 0 <= c < self.cols:
             return (r, c)
         return None
@@ -263,7 +273,7 @@ class MazeEditor:
             pygame.draw.line(self.screen, self.theme["hud_divider"], (0, self.TOOLBAR_HEIGHT), (self.window_w, self.TOOLBAR_HEIGHT), 1)
 
             btn_text = "[Ctrl+S] Save | [Ctrl+G] Gen | [Ctrl+Z] Undo | [B] BFS | [D] DFS | [A] A* | [T] Theme | [ESC] Exit"
-            self.screen.blit(self.font_btn.render(btn_text, True, self.theme["hud_accent"]), (12, 14))
+            self.screen.blit(self.font_btn.render(btn_text, True, self.theme["hud_accent"]), (14, 14))
 
             # canvas
             for r in range(self.rows):
@@ -282,8 +292,8 @@ class MazeEditor:
                         color = self.theme["open"]
 
                     rect = pygame.Rect(
-                        c * self.cell_size,
-                        self.TOOLBAR_HEIGHT + r * self.cell_size,
+                        self.offset_x + c * self.cell_size,
+                        self.offset_y + r * self.cell_size,
                         self.cell_size,
                         self.cell_size,
                     )
@@ -292,7 +302,7 @@ class MazeEditor:
                         pygame.draw.rect(self.screen, self.theme["border"], rect, 1)
 
             # statusbar
-            sb_y = self.TOOLBAR_HEIGHT + self.canvas_h
+            sb_y = self.window_h - self.STATUSBAR_HEIGHT
             sb_rect = pygame.Rect(0, sb_y, self.window_w, self.STATUSBAR_HEIGHT)
             pygame.draw.rect(self.screen, self.theme["hud_bg"], sb_rect)
             pygame.draw.line(self.screen, self.theme["hud_divider"], (0, sb_y), (self.window_w, sb_y), 1)
@@ -300,12 +310,12 @@ class MazeEditor:
             st_surf = self.font_status.render(
                 f"{self.status_msg} | Grid: {self.rows}x{self.cols}", True, self.theme["hud_text"]
             )
-            self.screen.blit(st_surf, (12, sb_y + 7))
+            self.screen.blit(st_surf, (14, sb_y + 7))
 
             pygame.display.flip()
             self.clock.tick(60)
 
-        pygame.quit()
+        # Do not call pygame.quit() here to keep parent GUI launcher alive
 
 if __name__ == "__main__":
     editor = MazeEditor()

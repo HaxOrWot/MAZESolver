@@ -32,22 +32,35 @@ class Renderer:
         self.theme_name = theme_name if theme_name else self.cfg.get_val("theme", "dark")
         self.theme = get_theme(self.theme_name)
 
-        max_dim = max(maze.rows, maze.cols)
-        override = self.cfg.get_val("cell_size_override", None)
-        self.cell_size = override if override else max(10, min(40, 700 // max_dim))
+        # Consistent, fixed window dimensions across all maze sizes
+        self.window_width = 1020
+        self.window_height = 700
         self.hud_width = self.cfg.get_val("hud_width", 280)
+        self.maze_area_w = self.window_width - self.hud_width
+
+        # Viewport for maze canvas
+        pad_x = 16
+        pad_y = 16
+        avail_w = self.maze_area_w - pad_x * 2
+        avail_h = self.window_height - pad_y * 2
+
+        # Auto-scale cells to fit within the viewport
+        cell_w = avail_w // max(1, maze.cols)
+        cell_h = avail_h // max(1, maze.rows)
+        self.cell_size = max(1, min(36, min(cell_w, cell_h)))
 
         self.maze_width = maze.cols * self.cell_size
         self.maze_height = maze.rows * self.cell_size
 
-        self.window_width = self.maze_width + self.hud_width
-        self.window_height = max(self.maze_height, 480)
+        # Center maze within left area
+        self.offset_x = pad_x + (avail_w - self.maze_width) // 2
+        self.offset_y = pad_y + (avail_h - self.maze_height) // 2
 
         pygame.display.set_caption(f"MAZESolver 2.0 — {algo_name}")
         self.screen = pygame.display.set_mode((self.window_width, self.window_height))
         self.clock = pygame.time.Clock()
 
-        self.hud = HUD(self.screen, self.maze_width, self.window_height, hud_width=self.hud_width)
+        self.hud = HUD(self.screen, self.maze_area_w, self.window_height, hud_width=self.hud_width)
         self.sound = SoundManager(
             enabled=self.cfg.get_val("sound_enabled", True),
             volume=self.cfg.get_val("sound_volume", 0.3),
@@ -100,8 +113,8 @@ class Renderer:
 
     def draw_glow(self, pos, glow_color, radius=4):
         r, c = pos
-        cx = c * self.cell_size + self.cell_size // 2
-        cy = r * self.cell_size + self.cell_size // 2
+        cx = self.offset_x + c * self.cell_size + self.cell_size // 2
+        cy = self.offset_y + r * self.cell_size + self.cell_size // 2
         glow_size = self.cell_size + radius * 2
         glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
 
@@ -117,12 +130,12 @@ class Renderer:
 
     def draw_cell(self, pos, color, size_offset=0):
         r, c = pos
-        x = c * self.cell_size - size_offset // 2
-        y = r * self.cell_size - size_offset // 2
+        x = self.offset_x + c * self.cell_size - size_offset // 2
+        y = self.offset_y + r * self.cell_size - size_offset // 2
         sz = self.cell_size + size_offset
         rect = pygame.Rect(x, y, sz, sz)
         pygame.draw.rect(self.screen, color, rect)
-        if self.cell_size > 8 and size_offset == 0:
+        if self.cell_size > 7 and size_offset == 0:
             pygame.draw.rect(self.screen, self.theme["border"], rect, 1)
 
     def draw_maze(self):
@@ -174,8 +187,8 @@ class Renderer:
         if not self.goal_burst_triggered and self.maze.goal:
             self.goal_burst_triggered = True
             gr, gc = self.maze.goal
-            px = gc * self.cell_size + self.cell_size / 2.0
-            py = gr * self.cell_size + self.cell_size / 2.0
+            px = self.offset_x + gc * self.cell_size + self.cell_size / 2.0
+            py = self.offset_y + gr * self.cell_size + self.cell_size / 2.0
             count = self.cfg.get_val("particle_count", 40)
             for _ in range(count):
                 self.particles.append(Particle(px, py, self.theme["goal"]))
@@ -349,4 +362,4 @@ class Renderer:
             pygame.display.flip()
             self.clock.tick(self.cfg.get_val("animation_fps", 60))
 
-        pygame.quit()
+        # note: do not call pygame.quit() here so parent GUI launcher stays alive
