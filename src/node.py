@@ -1,41 +1,27 @@
-"""
-MAZESolver — Node Class
-=======================
-Represents a search tree node tracking position, parent pointer, and depth.
-"""
-from typing import Optional, List, Tuple
-
-
+# search tree node
 class Node:
-    def __init__(
-        self,
-        position: Tuple[int, int],
-        parent: Optional["Node"] = None,
-        depth: int = 0,
-    ):
-        self.position: Tuple[int, int] = position
-        self.parent: Optional["Node"] = parent
-        self.depth: int = depth
+    def __init__(self, position: tuple, parent=None, depth: int = 0):
+        self.position = position
+        self.parent = parent
+        self.depth = depth
 
-    def get_path(self) -> List[Tuple[int, int]]:
-        """
-        Backtrack from current node through parents to get path from start to this node.
-        """
+    def get_path(self):
+        """backtracks parents to get path from start"""
         path = []
-        curr: Optional[Node] = self
+        curr = self
         while curr is not None:
             path.append(curr.position)
             curr = curr.parent
         path.reverse()
         return path
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other):
         if isinstance(other, Node):
             return self.position == other.position
         return False
 
-    def __hash__(self) -> int:
+    def __hash__(self):
         return hash(self.position)
 
-    def __repr__(self) -> str:
-        return f"Node(position={self.position}, depth={self.depth})"
+    def __repr__(self):
+        return f"Node(pos={self.position}, depth={self.depth})"

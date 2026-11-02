@@ -1,35 +1,29 @@
-"""
-MAZESolver — Recursive Backtracking Maze Generator
-===================================================
-Generates intricate, winding mazes with long corridors using randomized DFS.
-"""
 import random
 import sys
-from typing import List
 from src.generator.base_generator import BaseGenerator
 
-
 class RecursiveBacktrackGenerator(BaseGenerator):
-    def generate(self) -> List[List[str]]:
-        # Increase recursion limit for large mazes
-        required_depth = (self.rows * self.cols) // 2 + 1000
-        if required_depth > sys.getrecursionlimit():
-            sys.setrecursionlimit(required_depth)
+    def generate(self):
+        """randomized DFS to carve corridors"""
+        # bump recursion limit in case of huge mazes
+        depth = (self.rows * self.cols) // 2 + 1000
+        if depth > sys.getrecursionlimit():
+            sys.setrecursionlimit(depth)
 
         visited = set()
 
-        def dfs(r: int, c: int) -> None:
+        def dfs(r, c):
             visited.add((r, c))
             self._carve(r, c)
 
-            directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
-            random.shuffle(directions)
+            dirs = [(-2, 0), (2, 0), (0, -2), (0, 2)]
+            random.shuffle(dirs)
 
-            for dr, dc in directions:
+            for dr, dc in dirs:
                 nr, nc = r + dr, c + dc
                 if 0 < nr < self.rows - 1 and 0 < nc < self.cols - 1:
                     if (nr, nc) not in visited:
-                        # Carve intermediate wall cell between (r, c) and (nr, nc)
+                        # knock down wall in-between
                         self._carve(r + dr // 2, c + dc // 2)
                         dfs(nr, nc)
 

@@ -1,27 +1,17 @@
-"""
-MAZESolver — DLS (Depth-Limited Search) Solver
-==============================================
-A variant of DFS that terminates search branches exceeding a specified depth limit.
-Prevents infinite looping in unbounded search spaces.
-"""
 import time
-from typing import Dict, Any, Optional, List, Tuple
 from src.node import Node
 from src.algorithms.base_solver import BaseSolver
 from src.maze import Maze
 
-
 class DLSSolver(BaseSolver):
-    def __init__(self, maze: Maze, limit: Optional[int] = None):
+    def __init__(self, maze: Maze, limit=None):
         super().__init__(maze)
-        self.limit: int = limit if limit is not None else (maze.rows + maze.cols)
-        self.frontier_history: List[List[Tuple[int, int]]] = []
+        # default limit is rows + cols if none passed
+        self.limit = limit if limit is not None else (maze.rows + maze.cols)
+        self.frontier_history = []
 
-    def solve(self) -> Dict[str, Any]:
-        """
-        Executes Depth-Limited Search on the maze up to self.limit depth.
-        Returns a result dictionary including 'depth_limit'.
-        """
+    def solve(self) -> dict:
+        """DFS with depth cap to prevent going in circles forever"""
         start_time = time.perf_counter()
 
         start_node = Node(self.maze.start, parent=None, depth=0)
@@ -31,43 +21,42 @@ class DLSSolver(BaseSolver):
         self.frontier_history = []
 
         while stack:
-            current = stack.pop()
+            curr = stack.pop()
 
-            if current.position in visited:
+            if curr.position in visited:
                 continue
 
-            visited.add(current.position)
-            visited_order.append(current.position)
+            visited.add(curr.position)
+            visited_order.append(curr.position)
             self.frontier_history.append([n.position for n in reversed(stack[-8:])])
 
-            if current.position == self.maze.goal:
-                path = current.get_path()
-                elapsed = time.perf_counter() - start_time
+            if curr.position == self.maze.goal:
+                path = curr.get_path()
                 return {
                     "path": path,
                     "visited": visited_order,
                     "nodes_explored": len(visited_order),
                     "path_length": len(path),
-                    "time_taken": elapsed,
+                    "time_taken": time.perf_counter() - start_time,
                     "found": True,
                     "depth_limit": self.limit,
                     "frontier_history": self.frontier_history,
                 }
 
-            if current.depth >= self.limit:
+            # prune if depth limit reached
+            if curr.depth >= self.limit:
                 continue
 
-            for neighbor in self.maze.get_neighbors(current.position):
-                if neighbor not in visited:
-                    stack.append(Node(neighbor, parent=current, depth=current.depth + 1))
+            for nb in self.maze.get_neighbors(curr.position):
+                if nb not in visited:
+                    stack.append(Node(nb, parent=curr, depth=curr.depth + 1))
 
-        elapsed = time.perf_counter() - start_time
         return {
             "path": [],
             "visited": visited_order,
             "nodes_explored": len(visited_order),
             "path_length": 0,
-            "time_taken": elapsed,
+            "time_taken": time.perf_counter() - start_time,
             "found": False,
             "depth_limit": self.limit,
             "frontier_history": self.frontier_history,

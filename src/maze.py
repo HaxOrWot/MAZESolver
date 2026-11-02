@@ -1,35 +1,23 @@
-"""
-MAZESolver — Maze Class
-=======================
-Handles maze loading, parsing, validation, and neighbor generation.
-"""
-from typing import List, Tuple, Optional
-
-
+# loads and handles maze representation
 class Maze:
-    # 4 cardinal directions: UP, DOWN, LEFT, RIGHT
-    DIRECTIONS: List[Tuple[int, int]] = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    # UP, DOWN, LEFT, RIGHT
+    DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     def __init__(self, filepath: str):
-        self.grid: List[List[str]] = []
-        self.rows: int = 0
-        self.cols: int = 0
-        self.start: Optional[Tuple[int, int]] = None
-        self.goal: Optional[Tuple[int, int]] = None
-        self.filepath: str = filepath
+        self.grid = []
+        self.rows = 0
+        self.cols = 0
+        self.start = None
+        self.goal = None
+        self.filepath = filepath
         self.load_from_file(filepath)
 
-    def load_from_file(self, filepath: str) -> None:
-        """
-        Loads maze grid from a .txt file, locates start 'S' and goal 'G'.
-        Raises ValueError if 'S' or 'G' is not found.
-        """
+    def load_from_file(self, filepath: str):
+        """reads text file and parses S and G"""
         with open(filepath, "r", encoding="utf-8") as f:
             lines = [line.rstrip("\r\n") for line in f]
 
-        # Filter empty lines at beginning/end if any
         lines = [line for line in lines if line]
-
         if not lines:
             raise ValueError("Maze file is empty.")
 
@@ -37,7 +25,7 @@ class Maze:
         self.rows = len(self.grid)
         self.cols = max(len(row) for row in self.grid)
 
-        # Pad shorter rows with spaces if any lines differ in length
+        # pad shorter rows if needed
         for r in range(self.rows):
             if len(self.grid[r]) < self.cols:
                 self.grid[r].extend([" "] * (self.cols - len(self.grid[r])))
@@ -60,34 +48,30 @@ class Maze:
         if not goal_found:
             raise ValueError("Goal position 'G' not found in maze file.")
 
-    def is_in_bounds(self, pos: Tuple[int, int]) -> bool:
-        """Check if (r, c) is within the grid boundary."""
+        # TODO: handle edge case where start == goal
+
+    def is_in_bounds(self, pos: tuple) -> bool:
         r, c = pos
         return 0 <= r < self.rows and 0 <= c < self.cols
 
-    def is_wall(self, pos: Tuple[int, int]) -> bool:
-        """Check if (r, c) is a wall '#'."""
+    def is_wall(self, pos: tuple) -> bool:
         if not self.is_in_bounds(pos):
             return False
         return self.grid[pos[0]][pos[1]] == "#"
 
-    def is_valid(self, pos: Tuple[int, int]) -> bool:
-        """A cell is valid if in bounds and not a wall."""
+    def is_valid(self, pos: tuple) -> bool:
         return self.is_in_bounds(pos) and not self.is_wall(pos)
 
-    def get_neighbors(self, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
-        """
-        Returns passable adjacent neighbors (UP, DOWN, LEFT, RIGHT).
-        """
+    def get_neighbors(self, pos: tuple):
+        # returns valid cardinal neighbors
         neighbors = []
         r, c = pos
         for dr, dc in self.DIRECTIONS:
-            neighbor = (r + dr, c + dc)
-            if self.is_valid(neighbor):
-                neighbors.append(neighbor)
+            nb = (r + dr, c + dc)
+            if self.is_valid(nb):
+                neighbors.append(nb)
         return neighbors
 
-    def display(self) -> None:
-        """Prints the maze grid to terminal."""
+    def display(self):
         for row in self.grid:
             print("".join(row))

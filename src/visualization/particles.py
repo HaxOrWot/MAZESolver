@@ -1,16 +1,10 @@
-"""
-MAZESolver — Particle System
-============================
-Used for celebratory particle bursts when the goal is reached.
-"""
 import math
 import random
 import pygame
-from typing import Tuple
 
-
+# simple celebratory particles on goal reach
 class Particle:
-    def __init__(self, x: float, y: float, color: Tuple[int, int, int]):
+    def __init__(self, x, y, color):
         self.x = float(x)
         self.y = float(y)
         angle = random.uniform(0, 2 * math.pi)
@@ -22,18 +16,18 @@ class Particle:
         self.size = float(random.randint(3, 6))
         self.color = color
 
-    def update(self) -> None:
+    def update(self):
         self.x += self.vx
         self.y += self.vy
-        self.vy += 0.15  # gravity
+        self.vy += 0.15  # gravity pull
         self.life -= self.decay
         self.size = max(1.0, self.size - 0.05)
 
     @property
-    def is_alive(self) -> bool:
+    def is_alive(self):
         return self.life > 0.0
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen):
         if not self.is_alive:
             return
         alpha = max(0, min(255, int(self.life * 255)))

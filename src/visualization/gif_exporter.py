@@ -1,24 +1,16 @@
-"""
-MAZESolver — Animated GIF Exporter
-==================================
-Captures Pygame display frames and encodes them into smooth animated GIFs using Pillow.
-"""
-import io
 import os
 import pygame
 from PIL import Image
-from typing import List
-
 
 class GIFExporter:
-    def __init__(self, skip_frames: int = 3, fps: int = 15):
-        self.frames: List[Image.Image] = []
+    def __init__(self, skip_frames=3, fps=15):
+        self.frames = []
         self.skip_frames = max(1, skip_frames)
         self.frame_count = 0
         self.fps = fps
 
-    def capture(self, screen: pygame.Surface) -> None:
-        """Call every frame. Captures every Nth frame to avoid massive files."""
+    def capture(self, screen):
+        # captures frame every N ticks so the gif file isn't huge
         if self.frame_count % self.skip_frames == 0:
             raw = pygame.image.tostring(screen, "RGB")
             size = screen.get_size()
@@ -26,8 +18,7 @@ class GIFExporter:
             self.frames.append(img)
         self.frame_count += 1
 
-    def export(self, filepath: str) -> None:
-        """Encodes and saves the captured frames as an animated GIF."""
+    def export(self, filepath: str):
         if not self.frames:
             return
         os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
@@ -40,4 +31,4 @@ class GIFExporter:
             loop=0,
             optimize=True,
         )
-        print(f"[GIF] Exported {len(self.frames)} frames to {filepath}")
+        print(f"[GIF] Saved animated GIF ({len(self.frames)} frames) -> {filepath}")

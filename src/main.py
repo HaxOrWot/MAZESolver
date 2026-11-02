@@ -1,26 +1,14 @@
-"""
-MAZESolver — CLI & Execution Coordinator (v2.0)
-================================================
-Entry point supporting:
-- Single algorithm execution (BFS, DFS, DLS, IDDFS, A*)
-- 5-Algorithm Comprehensive Comparison Mode
-- Synchronized Split-Screen Side-by-Side Visualization
-- Procedural Maze Generation on demand
-- Interactive GUI Maze Editor
-- Animated GIF and High-Resolution PNG export
-"""
+# main CLI driver for the project
 import argparse
 import datetime
 import os
 import sys
-from typing import List, Dict, Any
 
-# Ensure project root is in python path
+# add root to path so imports work from anywhere
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Ensure UTF-8 output on Windows consoles
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -36,31 +24,24 @@ from src.algorithms.astar import AStarSolver
 from src.generator.recursive_backtrack import RecursiveBacktrackGenerator
 from src.generator.prims import PrimsGenerator
 
-
-def append_to_log(algo_name: str, maze_file: str, result: dict) -> None:
-    """
-    Appends execution stats to output/results_log.txt.
-    Format: [YYYY-MM-DD HH:MM] | ALGO | filename | FOUND/NOT FOUND | X steps | Y nodes | Zms
-    """
+def append_to_log(algo_name, maze_file, result):
+    # logs run to results_log.txt
     out_dir = os.path.join(PROJECT_ROOT, "output")
     os.makedirs(out_dir, exist_ok=True)
     log_path = os.path.join(out_dir, "results_log.txt")
 
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    basename = os.path.basename(maze_file)
-    status_str = "FOUND" if result.get("found") else "NOT FOUND"
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    base = os.path.basename(maze_file)
+    status = "FOUND" if result.get("found") else "NOT FOUND"
     steps = f"{result.get('path_length', 0)} steps"
     nodes = f"{result.get('nodes_explored', 0)} nodes"
     time_ms = f"{result.get('time_taken', 0.0) * 1000:.2f}ms"
 
-    log_line = f"[{timestamp}] | {algo_name.upper()} | {basename} | {status_str} | {steps} | {nodes} | {time_ms}\n"
-
+    line = f"[{ts}] | {algo_name.upper()} | {base} | {status} | {steps} | {nodes} | {time_ms}\n"
     with open(log_path, "a", encoding="utf-8") as f:
-        f.write(log_line)
+        f.write(line)
 
-
-def print_result(algo_name: str, maze_file: str, result: dict) -> None:
-    """Pretty-prints a single algorithm run to the terminal."""
+def print_result(algo_name, maze_file, result):
     found_str = "YES" if result.get("found") else "NO"
     time_sec = result.get("time_taken", 0.0)
     time_ms = time_sec * 1000
@@ -79,43 +60,17 @@ def print_result(algo_name: str, maze_file: str, result: dict) -> None:
         print(f"Iterations : {result['iterations']}")
     print("=" * 44 + "\n")
 
-
-def print_comparison(results: List[Dict[str, Any]], algo_names: List[str]) -> None:
-    """Prints a formatted comparison table for multiple algorithm results."""
+def print_comparison(results, algo_names):
     col_algo = 16
     col_found = 9
     col_nodes = 16
     col_path = 14
     col_time = 14
 
-    top_border = (
-        "╔" + "═" * col_algo
-        + "╦" + "═" * col_found
-        + "╦" + "═" * col_nodes
-        + "╦" + "═" * col_path
-        + "╦" + "═" * col_time + "╗"
-    )
-    header = (
-        "║" + "  Algorithm".ljust(col_algo)
-        + "║" + "  Found? ".ljust(col_found)
-        + "║" + " Nodes Explored ".ljust(col_nodes)
-        + "║" + " Path Length  ".ljust(col_path)
-        + "║" + "  Time (ms)   ".ljust(col_time) + "║"
-    )
-    mid_border = (
-        "╠" + "═" * col_algo
-        + "╬" + "═" * col_found
-        + "╬" + "═" * col_nodes
-        + "╬" + "═" * col_path
-        + "╬" + "═" * col_time + "╣"
-    )
-    bot_border = (
-        "╚" + "═" * col_algo
-        + "╩" + "═" * col_found
-        + "╩" + "═" * col_nodes
-        + "╩" + "═" * col_path
-        + "╩" + "═" * col_time + "╝"
-    )
+    top_border = "╔" + "═" * col_algo + "╦" + "═" * col_found + "╦" + "═" * col_nodes + "╦" + "═" * col_path + "╦" + "═" * col_time + "╗"
+    header = "║" + "  Algorithm".ljust(col_algo) + "║" + "  Found? ".ljust(col_found) + "║" + " Nodes Explored ".ljust(col_nodes) + "║" + " Path Length  ".ljust(col_path) + "║" + "  Time (ms)   ".ljust(col_time) + "║"
+    mid_border = "╠" + "═" * col_algo + "╬" + "═" * col_found + "╬" + "═" * col_nodes + "╬" + "═" * col_path + "╬" + "═" * col_time + "╣"
+    bot_border = "╚" + "═" * col_algo + "╩" + "═" * col_found + "╩" + "═" * col_nodes + "╩" + "═" * col_path + "╩" + "═" * col_time + "╝"
 
     print("\n" + top_border)
     print(header)
@@ -138,23 +93,19 @@ def print_comparison(results: List[Dict[str, Any]], algo_names: List[str]) -> No
 
     print(bot_border + "\n")
 
-
-def resolve_maze_path(maze_arg: str) -> str:
-    """Intelligently resolves maze argument (e.g. '20' -> 'data/maze_20x20.txt')."""
+def resolve_maze_path(maze_arg):
+    # helper to allow shortcuts like '20' or 'data/maze_20x20.txt'
     if not maze_arg:
         default_path = os.path.join(PROJECT_ROOT, "data", "maze_20x20.txt")
         return default_path if os.path.exists(default_path) else "data/maze_5x5.txt"
 
-    # Direct path
     if os.path.exists(maze_arg):
         return maze_arg
 
-    # Direct in data/
     in_data = os.path.join(PROJECT_ROOT, "data", maze_arg)
     if os.path.exists(in_data):
         return in_data
 
-    # Shorthand number: '20' or '20x20' -> 'data/maze_20x20.txt'
     clean_num = maze_arg.lower().replace(".txt", "").replace("maze_", "")
     if "x" in clean_num:
         cand = os.path.join(PROJECT_ROOT, "data", f"maze_{clean_num}.txt")
@@ -166,72 +117,41 @@ def resolve_maze_path(maze_arg: str) -> str:
 
     return maze_arg
 
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="MAZESolver — Uninformed and Informed Searches"
-    )
-    parser.add_argument("-m", "--maze", help="Path or shorthand size for maze (e.g. '20', '100', 'data/maze_20x20.txt')")
+def main():
+    parser = argparse.ArgumentParser(description="MAZESolver CLI")
+    parser.add_argument("-m", "--maze", help="Path or shorthand size (e.g. 20, 100, data/maze_20x20.txt)")
     parser.add_argument(
         "-a",
         "--algo",
         choices=["bfs", "dfs", "dls", "iddfs", "astar"],
         help="Algorithm: bfs, dfs, dls, iddfs, or astar",
     )
-    parser.add_argument(
-        "-v", "--visual", action="store_true", help="Launch interactive visual animation"
-    )
-    parser.add_argument(
-        "-l", "--limit", type=int, help="Depth limit for DLS (default: rows + cols)"
-    )
-    parser.add_argument(
-        "-c",
-        "--compare",
-        action="store_true",
-        help="Run 5 algorithms side-by-side (BFS, DFS, DLS, IDDFS, A*)",
-    )
-    parser.add_argument(
-        "-s",
-        "--splitview",
-        action="store_true",
-        help="Open 3-panel synchronized comparison window (BFS, DFS, DLS)",
-    )
-    parser.add_argument(
-        "-t",
-        "--theme",
-        choices=["dark", "neon", "retro", "light"],
-        default=None,
-        help="Visual theme (overrides config.json)",
-    )
-    parser.add_argument(
-        "--export-gif", action="store_true", help="Capture and save animated GIF"
-    )
-    parser.add_argument(
-        "-g", "--generate", action="store_true", help="Procedurally generate a maze first"
-    )
-    parser.add_argument(
-        "--maze-size", type=int, default=21, help="Dimension NxN for generated maze (default: 21)"
-    )
+    parser.add_argument("-v", "--visual", action="store_true", help="Launch visual animation")
+    parser.add_argument("-l", "--limit", type=int, help="Depth limit for DLS")
+    parser.add_argument("-c", "--compare", action="store_true", help="Compare all algorithms")
+    parser.add_argument("-s", "--splitview", action="store_true", help="Split view BFS vs DFS vs DLS")
+    parser.add_argument("-t", "--theme", choices=["dark", "neon", "retro", "light"], default=None)
+    parser.add_argument("--export-gif", action="store_true", help="Save animated GIF")
+    parser.add_argument("-g", "--generate", action="store_true", help="Generate maze first")
+    parser.add_argument("--maze-size", type=int, default=21, help="Size NxN for generated maze")
     parser.add_argument(
         "--gen-algo",
         choices=["recursive_backtrack", "prims"],
         default="recursive_backtrack",
-        help="Generation algorithm (default: recursive_backtrack)",
+        help="Generation algorithm",
     )
-    parser.add_argument(
-        "-e", "--edit", action="store_true", help="Open the interactive maze editor"
-    )
+    parser.add_argument("-e", "--edit", action="store_true", help="Open maze editor")
 
     args = parser.parse_args()
 
-    # 1. Interactive Maze Editor Mode
+    # editor mode
     if args.edit:
         from src.editor.maze_editor import MazeEditor
         editor = MazeEditor(rows=args.maze_size, cols=args.maze_size, theme_name=args.theme or "dark")
         editor.run()
         return
 
-    # 2. Procedural Maze Generation
+    # procedural generation
     if args.generate:
         gen_dir = os.path.join(PROJECT_ROOT, "data", "generated")
         os.makedirs(gen_dir, exist_ok=True)
@@ -248,7 +168,6 @@ def main() -> None:
         args.maze = gen_file
         print(f"[Generate] Generated solvable maze -> {args.maze}")
 
-    # Resolve maze shorthand if given, or fallback to default 20x20
     args.maze = resolve_maze_path(args.maze)
 
     if not os.path.exists(args.maze):
@@ -257,7 +176,7 @@ def main() -> None:
 
     maze = Maze(args.maze)
 
-    # 3. Split-Screen Comparison Mode
+    # 3-panel split view
     if args.splitview:
         from src.visualization.split_view import SplitRenderer
         bfs_res = BFSSolver(maze).solve()
@@ -273,7 +192,7 @@ def main() -> None:
         renderer.run()
         return
 
-    # 4. Comprehensive Compare Mode (5 Algorithms)
+    # compare mode
     if args.compare:
         print(f"\nRunning 5-Algorithm Comparison on '{os.path.basename(args.maze)}'...")
         bfs_res = BFSSolver(maze).solve()
@@ -292,7 +211,7 @@ def main() -> None:
             append_to_log(name, args.maze, res)
         return
 
-    # Default to visual BFS if no specific action specified
+    # default to visual bfs if nothing specified
     if not args.algo:
         args.algo = "bfs"
         args.visual = True
@@ -331,7 +250,6 @@ def main() -> None:
             export_gif=args.export_gif,
         )
         renderer.run()
-
 
 if __name__ == "__main__":
     main()

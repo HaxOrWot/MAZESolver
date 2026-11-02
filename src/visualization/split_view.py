@@ -1,29 +1,13 @@
-"""
-MAZESolver — Split-Screen Comparison Renderer
-=============================================
-Renders 3 algorithms (BFS, DFS, DLS) animating side-by-side simultaneously
-in a synchronized multi-panel Pygame display.
-"""
+# renders BFS, DFS, and DLS side by side
 import datetime
 import os
 import pygame
-from typing import Dict, Any, List, Set, Tuple
 
 from src.maze import Maze
 from src.visualization.themes import get_theme, next_theme
 
-
 class SplitPanel:
-    def __init__(
-        self,
-        maze: Maze,
-        result: Dict[str, Any],
-        algo_name: str,
-        x_offset: int,
-        cell_size: int,
-        theme: Dict[str, Any],
-        header_height: int = 32,
-    ):
+    def __init__(self, maze, result, algo_name, x_offset, cell_size, theme, header_height=32):
         self.maze = maze
         self.result = result
         self.algo_name = algo_name
@@ -32,23 +16,23 @@ class SplitPanel:
         self.theme = theme
         self.header_height = header_height
 
-        self.visited_nodes: List[Tuple[int, int]] = result.get("visited", [])
-        self.solution_path: List[Tuple[int, int]] = result.get("path", [])
-        self.found: bool = result.get("found", False)
-        self.time_taken: float = result.get("time_taken", 0.0)
+        self.visited_nodes = result.get("visited", [])
+        self.solution_path = result.get("path", [])
+        self.found = result.get("found", False)
+        self.time_taken = result.get("time_taken", 0.0)
 
         self.current_step = 0
         self.path_reveal_step = 0
         self.status = "SEARCHING"
-        self.revealed_visited: Set[Tuple[int, int]] = set()
+        self.revealed_visited = set()
 
-    def reset(self) -> None:
+    def reset(self):
         self.current_step = 0
         self.path_reveal_step = 0
         self.revealed_visited.clear()
         self.status = "SEARCHING"
 
-    def advance(self, steps: int) -> None:
+    def advance(self, steps):
         if self.status == "SEARCHING":
             if self.current_step < len(self.visited_nodes):
                 target = min(len(self.visited_nodes), self.current_step + steps)
@@ -65,14 +49,12 @@ class SplitPanel:
                 self.path_reveal_step = len(self.solution_path)
                 self.status = "SOLVED"
 
-    def draw(self, screen: pygame.Surface, font_title: pygame.font.Font, font_stats: pygame.font.Font) -> None:
-        # 1. Panel Header
+    def draw(self, screen, font_title, font_stats):
         hdr_rect = pygame.Rect(self.x_offset, 0, self.maze.cols * self.cell_size, self.header_height)
         pygame.draw.rect(screen, self.theme["hud_bg"], hdr_rect)
         hdr_lbl = font_title.render(self.algo_name, True, self.theme["hud_accent"])
         screen.blit(hdr_lbl, (self.x_offset + 8, 7))
 
-        # 2. Grid Canvas
         path_set = set(self.solution_path[: self.path_reveal_step])
         frontier_pos = (
             self.visited_nodes[self.current_step - 1]
@@ -108,7 +90,6 @@ class SplitPanel:
                 if self.cell_size > 8:
                     pygame.draw.rect(screen, self.theme["border"], rect, 1)
 
-        # 3. Mini Stats below canvas
         stat_y = self.header_height + self.maze.rows * self.cell_size + 6
         st_color = (
             self.theme["hud_success"]
@@ -119,25 +100,22 @@ class SplitPanel:
         stat_line = f"Explored: {min(self.current_step, len(self.visited_nodes))} | {display_status}"
         screen.blit(font_stats.render(stat_line, True, st_color), (self.x_offset + 8, stat_y))
 
-
 class SplitRenderer:
     HEADER_HEIGHT = 32
     BOTTOM_BAR_HEIGHT = 70
 
-    def __init__(self, maze: Maze, results: Dict[str, Dict[str, Any]], theme_name: str = "dark"):
+    def __init__(self, maze, results, theme_name="dark"):
         pygame.init()
         self.maze = maze
         self.theme_name = theme_name
         self.theme = get_theme(theme_name)
 
-        # Dynamic panel cell sizing
         max_dim = max(maze.rows, maze.cols)
         self.cell_size = max(8, min(24, 480 // max_dim))
 
         self.panel_w = self.cell_size * maze.cols
         self.panel_h = self.cell_size * maze.rows + self.HEADER_HEIGHT
 
-        # 3 panels with 2px dividers
         self.panels_data = [
             ("BFS", results.get("bfs", {})),
             ("DFS", results.get("dfs", {})),
@@ -162,7 +140,7 @@ class SplitRenderer:
             self.font_stats = pygame.font.Font(None, 14)
             self.font_bottom = pygame.font.Font(None, 16)
 
-        self.panels: List[SplitPanel] = []
+        self.panels = []
         for idx, (name, res) in enumerate(self.panels_data):
             offset_x = idx * (self.panel_w + 3)
             self.panels.append(
@@ -181,7 +159,7 @@ class SplitRenderer:
         self.is_running = True
         self.steps_per_frame = 3
 
-    def save_screenshot(self) -> None:
+    def save_screenshot(self):
         shots_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
             "output",
@@ -194,8 +172,7 @@ class SplitRenderer:
         pygame.image.save(self.screen, path)
         print(f"[Screenshot] Saved: {path}")
 
-    def run(self) -> None:
-        """Main split-screen loop."""
+    def run(self):
         while self.is_running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -222,12 +199,10 @@ class SplitRenderer:
                     elif event.key == pygame.K_DOWN:
                         self.steps_per_frame = max(1, self.steps_per_frame - 2)
 
-            # Advance animation
             if not self.is_paused:
                 for panel in self.panels:
                     panel.advance(self.steps_per_frame)
 
-            # Render
             self.screen.fill(self.theme["bg"])
 
             for idx, panel in enumerate(self.panels):
@@ -236,13 +211,12 @@ class SplitRenderer:
                     div_x = (idx + 1) * (self.panel_w + 3) - 2
                     pygame.draw.line(self.screen, self.theme["hud_divider"], (div_x, 0), (div_x, self.panel_h + 24), 2)
 
-            # Bottom Bar
+            # bottom summary
             bar_y = self.panel_h + 24
             bar_rect = pygame.Rect(0, bar_y, self.window_w, self.BOTTOM_BAR_HEIGHT)
             pygame.draw.rect(self.screen, self.theme["hud_bg"], bar_rect)
             pygame.draw.line(self.screen, self.theme["hud_divider"], (0, bar_y), (self.window_w, bar_y), 1)
 
-            # Stats Summary
             summaries = []
             for p in self.panels:
                 p_len = str(p.result.get("path_length", 0)) if p.status == "SOLVED" else "--"

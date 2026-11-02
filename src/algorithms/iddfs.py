@@ -1,24 +1,14 @@
-"""
-MAZESolver — IDDFS (Iterative Deepening Depth-First Search) Solver
-=================================================================
-Combines BFS's optimality (shortest path in unweighted graphs)
-with DFS's memory efficiency by progressively deepening the search limit.
-"""
 import time
-from typing import Dict, Any, List, Tuple
 from src.node import Node
 from src.algorithms.base_solver import BaseSolver
-
 
 class IDDFSSolver(BaseSolver):
     def __init__(self, maze):
         super().__init__(maze)
-        self.frontier_history: List[List[Tuple[int, int]]] = []
+        self.frontier_history = []
 
-    def _dls_pass(
-        self, limit: int
-    ) -> Tuple[bool, List[Tuple[int, int]], List[Tuple[int, int]], List[List[Tuple[int, int]]]]:
-        """Executes a single depth-limited search pass."""
+    def _dls_pass(self, limit):
+        # helper for single DLS pass at given depth
         start_node = Node(self.maze.start, parent=None, depth=0)
         stack = [start_node]
         visited = set()
@@ -26,32 +16,29 @@ class IDDFSSolver(BaseSolver):
         frontier_snaps = []
 
         while stack:
-            current = stack.pop()
+            curr = stack.pop()
 
-            if current.position in visited:
+            if curr.position in visited:
                 continue
 
-            visited.add(current.position)
-            visited_order.append(current.position)
+            visited.add(curr.position)
+            visited_order.append(curr.position)
             frontier_snaps.append([n.position for n in reversed(stack[-8:])])
 
-            if current.position == self.maze.goal:
-                return True, current.get_path(), visited_order, frontier_snaps
+            if curr.position == self.maze.goal:
+                return True, curr.get_path(), visited_order, frontier_snaps
 
-            if current.depth >= limit:
+            if curr.depth >= limit:
                 continue
 
-            for neighbor in self.maze.get_neighbors(current.position):
-                if neighbor not in visited:
-                    stack.append(Node(neighbor, parent=current, depth=current.depth + 1))
+            for nb in self.maze.get_neighbors(curr.position):
+                if nb not in visited:
+                    stack.append(Node(nb, parent=curr, depth=curr.depth + 1))
 
         return False, [], visited_order, frontier_snaps
 
-    def solve(self) -> Dict[str, Any]:
-        """
-        Runs DLS with increasing limits (L = 0, 1, 2, ...) until goal is found
-        or the max possible search depth is exceeded.
-        """
+    def solve(self) -> dict:
+        """Runs iterative deepening: L=0, 1, 2... until we hit goal"""
         start_time = time.perf_counter()
         all_visited = []
         self.frontier_history = []
@@ -64,13 +51,12 @@ class IDDFSSolver(BaseSolver):
             self.frontier_history.extend(snaps)
 
             if found:
-                elapsed = time.perf_counter() - start_time
                 return {
                     "path": path,
                     "visited": all_visited,
                     "nodes_explored": len(all_visited),
                     "path_length": len(path),
-                    "time_taken": elapsed,
+                    "time_taken": time.perf_counter() - start_time,
                     "found": True,
                     "iterations": iteration + 1,
                     "frontier_history": self.frontier_history,
@@ -78,13 +64,12 @@ class IDDFSSolver(BaseSolver):
 
             iteration += 1
 
-        elapsed = time.perf_counter() - start_time
         return {
             "path": [],
             "visited": all_visited,
             "nodes_explored": len(all_visited),
             "path_length": 0,
-            "time_taken": elapsed,
+            "time_taken": time.perf_counter() - start_time,
             "found": False,
             "iterations": iteration,
             "frontier_history": self.frontier_history,

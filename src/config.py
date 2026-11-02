@@ -1,15 +1,9 @@
-"""
-MAZESolver — Central Configuration
-==================================
-Singleton configuration loader managing config.json properties.
-"""
 import json
 import os
-from typing import Any
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
-
+# configuration manager
 class Config:
     _instance = None
 
@@ -38,20 +32,20 @@ class Config:
                 self._data = json.load(f)
 
     @classmethod
-    def get(cls) -> "Config":
+    def get(cls):
         if cls._instance is None:
             cls._instance = Config()
         return cls._instance
 
-    def __getattr__(self, key: str) -> Any:
+    def __getattr__(self, key):
         return self._data.get(key)
 
-    def get_val(self, key: str, default: Any = None) -> Any:
+    def get_val(self, key, default=None):
         return self._data.get(key, default)
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key, value):
         self._data[key] = value
 
-    def save(self) -> None:
+    def save(self):
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2)

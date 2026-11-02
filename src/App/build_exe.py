@@ -1,8 +1,4 @@
-"""
-MAZESolver 2.0 — PyInstaller Windows Executable Builder
-=======================================================
-Packages the entire project into a standalone single-file Windows desktop executable.
-"""
+# pyinstaller build script to make standalone MAZESolver.exe
 import os
 import shutil
 import subprocess
@@ -12,7 +8,6 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 APP_DIR = os.path.join(PROJECT_ROOT, "src", "App")
 ENTRY_POINT = os.path.join(APP_DIR, "main_app.py")
 
-
 def build():
     print("=" * 60)
     print("Building Standalone MAZESolver.exe ...")
@@ -21,7 +16,6 @@ def build():
     dist_dir = os.path.join(APP_DIR, "dist")
     build_dir = os.path.join(APP_DIR, "build")
 
-    # Separator for PyInstaller --add-data on Windows is ';'
     sep = ";" if sys.platform.startswith("win") else ":"
 
     cmd = [
@@ -56,7 +50,6 @@ def build():
             print("=" * 60)
     else:
         print("Build failed with return code:", res.returncode)
-
 
 if __name__ == "__main__":
     build()

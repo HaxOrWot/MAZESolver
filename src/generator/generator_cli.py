@@ -1,8 +1,4 @@
-"""
-MAZESolver — Generator CLI
-==========================
-Standalone command-line tool for procedurally generating solvable mazes.
-"""
+# cli helper for procedural maze generation
 import argparse
 import datetime
 import os
@@ -20,7 +16,6 @@ from src.algorithms.dfs import DFSSolver
 from src.algorithms.dls import DLSSolver
 from src.algorithms.iddfs import IDDFSSolver
 from src.algorithms.astar import AStarSolver
-
 
 def main():
     parser = argparse.ArgumentParser(description="MAZESolver — Procedural Maze Generator")
@@ -85,7 +80,6 @@ def main():
             from src.visualization.renderer import Renderer
             renderer = Renderer(maze, res, solver_name.upper())
             renderer.run()
-
 
 if __name__ == "__main__":
     main()

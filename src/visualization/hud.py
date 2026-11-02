@@ -1,15 +1,6 @@
-"""
-MAZESolver — Tabbed HUD (Heads-Up Display)
-=========================================
-Multi-tab HUD panel supporting:
-- Tab 1: Live performance stats & maze coverage progress bar
-- Tab 2: Real-time Frontier/Stack inspector
-- Tab 3: Interactive Algorithm Explainer
-Supports dynamic theme switching and audio state feedback.
-"""
+# sidebar heads-up display
 import os
 import pygame
-from typing import Dict, Any, List, Tuple
 
 ALGO_EXPLANATIONS = {
     "BFS": [
@@ -50,14 +41,13 @@ ALGO_EXPLANATIONS = {
     ],
 }
 
-
 class HUD:
-    def __init__(self, screen: pygame.Surface, maze_area_width: int, window_height: int, hud_width: int = 280):
+    def __init__(self, screen, maze_area_width: int, window_height: int, hud_width: int = 280):
         self.screen = screen
         self.x = maze_area_width
         self.width = hud_width
         self.height = window_height
-        self.active_tab = 1  # 1: Stats, 2: Inspector, 3: Explain
+        self.active_tab = 1  # 1: stats, 2: frontier stack, 3: explainer
         self.explain_scroll = 0
 
         pygame.font.init()
@@ -77,15 +67,13 @@ class HUD:
             self.font_value = pygame.font.Font(None, 22)
             self.font_small = pygame.font.Font(None, 13)
 
-    def draw_divider(self, y: int, theme: Dict[str, Any]) -> int:
-        """Draws a horizontal divider line and returns the next y coordinate."""
+    def draw_divider(self, y: int, theme):
         start = (self.x + 12, y)
         end = (self.x + self.width - 12, y)
         pygame.draw.line(self.screen, theme["hud_divider"], start, end, 1)
         return y + 10
 
-    def draw_tab_bar(self, y: int, theme: Dict[str, Any]) -> int:
-        """Draws the 3 tab selector buttons."""
+    def draw_tab_bar(self, y: int, theme):
         tabs = [("1:Stats", 1), ("2:Insp", 2), ("3:Help", 3)]
         tab_w = (self.width - 24) // 3
         for idx, (label, tab_id) in enumerate(tabs):
@@ -104,22 +92,7 @@ class HUD:
             self.screen.blit(lbl, (lx, y + 4))
         return y + 30
 
-    def draw(
-        self,
-        algo_name: str,
-        maze_filename: str,
-        nodes_explored: int,
-        path_length: int,
-        time_taken: float,
-        status: str,
-        theme: Dict[str, Any],
-        theme_name: str,
-        total_cells: int = 100,
-        frontier_snapshot: List[Tuple[int, int]] = None,
-        sound_enabled: bool = True,
-        steps_per_frame: int = 1,
-    ) -> None:
-        """Renders the full tabbed HUD panel."""
+    def draw(self, algo_name, maze_filename, nodes_explored, path_length, time_taken, status, theme, theme_name, total_cells=100, frontier_snapshot=None, sound_enabled=True, steps_per_frame=1):
         panel_rect = pygame.Rect(self.x, 0, self.width, self.height)
         pygame.draw.rect(self.screen, theme["hud_bg"], panel_rect)
         pygame.draw.line(self.screen, theme["hud_divider"], (self.x, 0), (self.x, self.height), 2)
@@ -127,16 +100,14 @@ class HUD:
         cur_x = self.x + 14
         cur_y = 12
 
-        # Header Title
         title_surf = self.font_title.render("MAZESolver 2.0", True, (255, 255, 255))
         self.screen.blit(title_surf, (cur_x, cur_y))
         cur_y += 24
 
-        # Tab Selection Bar
         cur_y = self.draw_tab_bar(cur_y, theme)
         cur_y = self.draw_divider(cur_y, theme)
 
-        # TAB 1: Performance Stats
+        # tab 1: stats
         if self.active_tab == 1:
             lbl_algo = self.font_label.render("Algorithm:", True, (150, 150, 150))
             self.screen.blit(lbl_algo, (cur_x, cur_y))
@@ -157,7 +128,6 @@ class HUD:
 
             cur_y = self.draw_divider(cur_y, theme)
 
-            # Status Badge
             if status == "SOLVED":
                 st_color = theme["hud_success"]
             elif status == "NO PATH":
@@ -172,7 +142,6 @@ class HUD:
 
             cur_y = self.draw_divider(cur_y, theme)
 
-            # Nodes Explored & Coverage Bar
             lbl_nodes = self.font_label.render("Nodes Explored:", True, (150, 150, 150))
             self.screen.blit(lbl_nodes, (cur_x, cur_y))
             cur_y += 16
@@ -180,7 +149,7 @@ class HUD:
             self.screen.blit(val_nodes, (cur_x, cur_y))
             cur_y += 22
 
-            # Coverage Bar
+            # progress bar
             pct = min(1.0, nodes_explored / max(1, total_cells))
             bar_w = self.width - 28
             bar_rect_bg = pygame.Rect(cur_x, cur_y, bar_w, 8)
@@ -194,7 +163,6 @@ class HUD:
             self.screen.blit(cov_lbl, (cur_x, cur_y))
             cur_y += 18
 
-            # Path Length & Time
             lbl_path = self.font_label.render("Path Length:", True, (150, 150, 150))
             self.screen.blit(lbl_path, (cur_x, cur_y))
             cur_y += 16
@@ -210,14 +178,14 @@ class HUD:
             self.screen.blit(val_time, (cur_x, cur_y))
             cur_y += 22
 
-        # TAB 2: Frontier / Stack Inspector
+        # tab 2: frontier
         elif self.active_tab == 2:
             lbl_head = self.font_bold.render("Frontier Inspector:", True, theme["hud_accent"])
             self.screen.blit(lbl_head, (cur_x, cur_y))
             cur_y += 20
 
             if frontier_snapshot:
-                count_lbl = self.font_small.render(f"Top 8 items in frontier:", True, (170, 170, 170))
+                count_lbl = self.font_small.render("Top 8 items in frontier:", True, (170, 170, 170))
                 self.screen.blit(count_lbl, (cur_x, cur_y))
                 cur_y += 18
                 for idx, pos in enumerate(frontier_snapshot[:8]):
@@ -234,7 +202,7 @@ class HUD:
             self.screen.blit(lbl_vis, (cur_x, cur_y))
             cur_y += 22
 
-        # TAB 3: Interactive Algorithm Explainer
+        # tab 3: explainer
         elif self.active_tab == 3:
             algo_key = "BFS"
             if "DFS" in algo_name and "IDDFS" not in algo_name:
@@ -255,7 +223,7 @@ class HUD:
                 self.screen.blit(surf, (cur_x, cur_y))
                 cur_y += 19
 
-        # Footer Stats & Controls Legend (Anchored at bottom)
+        # footer controls
         foot_y = self.height - 130
         self.draw_divider(foot_y, theme)
         foot_y += 6
@@ -265,12 +233,7 @@ class HUD:
         self.screen.blit(self.font_small.render(info_line, True, theme["hud_accent"]), (cur_x, foot_y))
         foot_y += 16
 
-        controls = [
-            ("[SPACE] Pause", "[R] Reset"),
-            ("[T] Cycle Theme", "[M] Mute Sound"),
-            ("[S] Screenshot", "[G] Export GIF"),
-            ("[1/2/3] Tabs", "[UP/DN] Speed"),
-        ]
+        controls = [("[SPACE] Pause", "[R] Reset"), ("[T] Cycle Theme", "[M] Mute Sound"), ("[S] Screenshot", "[G] Export GIF"), ("[1/2/3] Tabs", "[UP/DN] Speed")]
         for c1, c2 in controls:
             self.screen.blit(self.font_small.render(c1, True, (160, 160, 160)), (cur_x, foot_y))
             self.screen.blit(self.font_small.render(c2, True, (160, 160, 160)), (cur_x + 130, foot_y))

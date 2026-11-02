@@ -1,11 +1,6 @@
-"""
-MAZESolver — Color Themes
-=========================
-Contains theme color palettes for the Pygame renderer and HUD.
-"""
-from typing import Dict, Tuple, Any
+# theme color palettes for pygame
 
-THEMES: Dict[str, Dict[str, Any]] = {
+THEMES = {
     "dark": {
         "bg": (18, 18, 18),
         "wall": (40, 40, 40),
@@ -90,14 +85,10 @@ THEMES: Dict[str, Dict[str, Any]] = {
 
 THEME_ORDER = ["dark", "neon", "retro", "light"]
 
-
-def get_theme(name: str) -> Dict[str, Any]:
-    """Returns the requested theme dictionary, falling back to 'dark'."""
+def get_theme(name: str):
     return THEMES.get(name.lower(), THEMES["dark"])
 
-
-def next_theme(current: str) -> str:
-    """Returns the next theme name in sequence."""
+def next_theme(current: str):
     cur = current.lower()
     idx = THEME_ORDER.index(cur) if cur in THEME_ORDER else 0
     return THEME_ORDER[(idx + 1) % len(THEME_ORDER)]

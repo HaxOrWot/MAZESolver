@@ -1,14 +1,8 @@
-"""
-MAZESolver — Interactive Pygame Maze Editor
-===========================================
-Allows intuitive click-and-drag drawing of maze walls, start/goal placement,
-undo history, procedural generation shortcuts, and instant algorithm solving.
-"""
+# simple interactive maze editor using pygame
 import copy
 import datetime
 import os
 import sys
-from typing import List, Tuple, Optional, Set
 import pygame
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,12 +16,11 @@ from src.algorithms.dfs import DFSSolver
 from src.algorithms.astar import AStarSolver
 from src.visualization.themes import get_theme, next_theme
 
-
 class MazeEditor:
     TOOLBAR_HEIGHT = 44
     STATUSBAR_HEIGHT = 28
 
-    def __init__(self, rows: int = 21, cols: int = 21, theme_name: str = "dark"):
+    def __init__(self, rows=21, cols=21, theme_name="dark"):
         pygame.init()
         self.rows = rows if rows % 2 == 1 else rows + 1
         self.cols = cols if cols % 2 == 1 else cols + 1
@@ -54,42 +47,38 @@ class MazeEditor:
             self.font_btn = pygame.font.Font(None, 16)
             self.font_status = pygame.font.Font(None, 16)
 
-        # State
         self.grid = self._init_empty_grid()
-        self.undo_stack: List[List[List[str]]] = []
-        self.start: Optional[Tuple[int, int]] = (1, 1)
-        self.goal: Optional[Tuple[int, int]] = (self.rows - 2, self.cols - 2)
+        self.undo_stack = []
+        self.start = (1, 1)
+        self.goal = (self.rows - 2, self.cols - 2)
         self.grid[self.start[0]][self.start[1]] = "S"
         self.grid[self.goal[0]][self.goal[1]] = "G"
 
-        self.tool = "wall"  # "wall", "open", "start", "goal"
-        self.solution_overlay: Set[Tuple[int, int]] = set()
+        self.tool = "wall"
+        self.solution_overlay = set()
         self.status_msg = "Ready | Left-Click: Toggle Wall | Right-Click: S/G | B: BFS | Ctrl+S: Save"
         self.is_running = True
 
-    def _init_empty_grid(self) -> List[List[str]]:
-        """Perimeter walls, open interior."""
+    def _init_empty_grid(self):
         grid = [["#"] * self.cols for _ in range(self.rows)]
         for r in range(1, self.rows - 1):
             for c in range(1, self.cols - 1):
                 grid[r][c] = " "
         return grid
 
-    def push_undo(self) -> None:
-        """Pushes current state onto undo stack."""
+    def push_undo(self):
         self.undo_stack.append(copy.deepcopy(self.grid))
         if len(self.undo_stack) > 25:
             self.undo_stack.pop(0)
 
-    def undo(self) -> None:
-        """Reverts to previous grid state."""
+    def undo(self):
         if self.undo_stack:
             self.grid = self.undo_stack.pop()
             self._re_detect_start_goal()
             self.solution_overlay.clear()
             self.status_msg = "Undid last action."
 
-    def _re_detect_start_goal(self) -> None:
+    def _re_detect_start_goal(self):
         self.start = None
         self.goal = None
         for r in range(self.rows):
@@ -99,8 +88,7 @@ class MazeEditor:
                 elif self.grid[r][c] == "G":
                     self.goal = (r, c)
 
-    def _cell_at(self, mx: int, my: int) -> Optional[Tuple[int, int]]:
-        """Translates pixel coordinate to (row, col)."""
+    def _cell_at(self, mx, my):
         if my < self.TOOLBAR_HEIGHT or my >= self.TOOLBAR_HEIGHT + self.canvas_h:
             return None
         c = mx // self.cell_size
@@ -109,8 +97,7 @@ class MazeEditor:
             return (r, c)
         return None
 
-    def save_maze(self, filepath: Optional[str] = None) -> bool:
-        """Validates and saves the current maze to disk."""
+    def save_maze(self, filepath=None):
         if not self.start:
             self.status_msg = "Error: Start cell 'S' is missing!"
             return False
@@ -132,8 +119,7 @@ class MazeEditor:
         print(f"[Editor] Saved to {filepath}")
         return True
 
-    def generate_random(self) -> None:
-        """Fills grid with a procedurally generated maze."""
+    def generate_random(self):
         self.push_undo()
         gen = RecursiveBacktrackGenerator(self.rows, self.cols)
         gen.generate()
@@ -143,13 +129,11 @@ class MazeEditor:
         self.solution_overlay.clear()
         self.status_msg = "Generated procedural maze."
 
-    def solve_preview(self, algo: str = "bfs") -> None:
-        """Solves maze and displays path overlay."""
+    def solve_preview(self, algo="bfs"):
         if not self.start or not self.goal:
             self.status_msg = "Cannot solve: Start or Goal missing!"
             return
 
-        # Write to temporary file for Maze class
         temp_file = os.path.join(PROJECT_ROOT, "output", "_editor_temp.txt")
         os.makedirs(os.path.dirname(temp_file), exist_ok=True)
         with open(temp_file, "w", encoding="utf-8") as f:
@@ -173,8 +157,7 @@ class MazeEditor:
         except Exception as e:
             self.status_msg = f"Solve error: {e}"
 
-    def run(self) -> None:
-        """Main editor event and rendering loop."""
+    def run(self):
         drawing_wall = False
         drawing_open = False
 
@@ -215,14 +198,13 @@ class MazeEditor:
                     pos = self._cell_at(*event.pos)
                     if pos:
                         r, c = pos
-                        # Outer border is protected
                         if r == 0 or r == self.rows - 1 or c == 0 or c == self.cols - 1:
                             continue
 
                         self.push_undo()
                         self.solution_overlay.clear()
 
-                        if event.button == 1:  # Left click: toggle wall
+                        if event.button == 1:
                             if self.grid[r][c] == "#":
                                 self.grid[r][c] = " "
                                 drawing_open = True
@@ -234,7 +216,7 @@ class MazeEditor:
                                 self.grid[r][c] = "#"
                                 drawing_wall = True
 
-                        elif event.button == 3:  # Right click: cycle S -> G -> open
+                        elif event.button == 3:
                             if self.grid[r][c] != "S" and self.grid[r][c] != "G":
                                 if self.start:
                                     self.grid[self.start[0]][self.start[1]] = " "
@@ -273,10 +255,9 @@ class MazeEditor:
                                         self.goal = None
                                     self.grid[r][c] = " "
 
-            # Render
             self.screen.fill(self.theme["bg"])
 
-            # Toolbar
+            # toolbar
             tb_rect = pygame.Rect(0, 0, self.window_w, self.TOOLBAR_HEIGHT)
             pygame.draw.rect(self.screen, self.theme["hud_bg"], tb_rect)
             pygame.draw.line(self.screen, self.theme["hud_divider"], (0, self.TOOLBAR_HEIGHT), (self.window_w, self.TOOLBAR_HEIGHT), 1)
@@ -284,7 +265,7 @@ class MazeEditor:
             btn_text = "[Ctrl+S] Save | [Ctrl+G] Gen | [Ctrl+Z] Undo | [B] BFS | [D] DFS | [A] A* | [T] Theme | [ESC] Exit"
             self.screen.blit(self.font_btn.render(btn_text, True, self.theme["hud_accent"]), (12, 14))
 
-            # Canvas Grid
+            # canvas
             for r in range(self.rows):
                 for c in range(self.cols):
                     pos = (r, c)
@@ -310,7 +291,7 @@ class MazeEditor:
                     if self.cell_size > 10:
                         pygame.draw.rect(self.screen, self.theme["border"], rect, 1)
 
-            # Status Bar
+            # statusbar
             sb_y = self.TOOLBAR_HEIGHT + self.canvas_h
             sb_rect = pygame.Rect(0, sb_y, self.window_w, self.STATUSBAR_HEIGHT)
             pygame.draw.rect(self.screen, self.theme["hud_bg"], sb_rect)
@@ -325,7 +306,6 @@ class MazeEditor:
             self.clock.tick(60)
 
         pygame.quit()
-
 
 if __name__ == "__main__":
     editor = MazeEditor()
