@@ -1,7 +1,11 @@
 import json
 import os
+import sys
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+if getattr(sys, "frozen", False):
+    CONFIG_PATH = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(sys.executable)), "config.json")
+else:
+    CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
 # configuration manager
 class Config:

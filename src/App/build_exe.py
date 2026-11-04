@@ -16,6 +16,17 @@ def build():
     dist_dir = os.path.join(APP_DIR, "dist")
     build_dir = os.path.join(APP_DIR, "build")
 
+    # Clean existing build/dist artifacts
+    for d in [dist_dir, build_dir]:
+        if os.path.exists(d):
+            shutil.rmtree(d, ignore_errors=True)
+    spec_path = os.path.join(PROJECT_ROOT, "MAZESolver.spec")
+    if os.path.exists(spec_path):
+        try:
+            os.remove(spec_path)
+        except Exception:
+            pass
+
     sep = ";" if sys.platform.startswith("win") else ":"
     icon_path = os.path.join(PROJECT_ROOT, "assets", "icons", "app_icon.ico")
 
@@ -26,12 +37,19 @@ def build():
         "--name=MAZESolver",
         "--onefile",
         "--noconsole",
+        "--clean",
+        f"--paths={PROJECT_ROOT}",
         f"--icon={icon_path}",
         f"--distpath={dist_dir}",
         f"--workpath={build_dir}",
         f"--add-data={os.path.join(PROJECT_ROOT, 'data')}{sep}data",
         f"--add-data={os.path.join(PROJECT_ROOT, 'assets')}{sep}assets",
         f"--add-data={os.path.join(PROJECT_ROOT, 'config.json')}{sep}.",
+        "--collect-submodules=src",
+        "--hidden-import=src.visualization.split_view",
+        "--hidden-import=src.visualization.renderer",
+        "--hidden-import=src.visualization.themes",
+        "--hidden-import=src.editor.maze_editor",
         "--hidden-import=pygame",
         "--hidden-import=PIL",
         "--hidden-import=numpy",
@@ -45,6 +63,8 @@ def build():
         exe_src = os.path.join(dist_dir, "MAZESolver.exe")
         exe_dest = os.path.join(APP_DIR, "MAZESolver.exe")
         if os.path.exists(exe_src):
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/f", "/im", "MAZESolver.exe"], capture_output=True)
             shutil.copy2(exe_src, exe_dest)
             print("\n" + "=" * 60)
             print(f"SUCCESS! Executable built and copied to:")
