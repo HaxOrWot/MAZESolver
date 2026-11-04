@@ -1,21 +1,20 @@
-# sidebar heads-up display
 import os
 import pygame
 
 ALGO_EXPLANATIONS = {
     "BFS": [
         "Breadth-First Search (BFS):",
-        "- Explores level-by-level in concentric rings.",
-        "- Uses a FIFO Queue (First In, First Out).",
-        "- Guarantees the shortest path on unweighted grids.",
-        "- High memory usage: stores entire frontier ring.",
+        "- Explores shallowest nodes first using a FIFO Queue.",
+        "- Optimal: guarantees the shortest path on unweighted grid.",
+        "- Complete: always finds a path if one exists.",
+        "- High memory usage: stores entire search wavefront.",
     ],
     "DFS": [
         "Depth-First Search (DFS):",
-        "- Dives deeply along a branch before backtracking.",
-        "- Uses a LIFO Stack (Last In, First Out).",
-        "- Space-efficient: stores only current branch.",
-        "- Not optimal: solution path may be meandering.",
+        "- Explores deepest nodes first using a LIFO Stack.",
+        "- Non-optimal: path length depends on exploration order.",
+        "- Complete on finite grids with cycle detection.",
+        "- Low memory: only tracks active branch (O(depth)).",
     ],
     "DLS": [
         "Depth-Limited Search (DLS):",
@@ -49,6 +48,7 @@ class HUD:
         self.height = window_height
         self.active_tab = 1  # 1: stats, 2: frontier stack, 3: explainer
         self.explain_scroll = 0
+        self._cache = {}
 
         pygame.font.init()
         font_name = "Consolas"
@@ -66,6 +66,16 @@ class HUD:
             self.font_bold = pygame.font.Font(None, 16)
             self.font_value = pygame.font.Font(None, 22)
             self.font_small = pygame.font.Font(None, 13)
+
+    def _render_text(self, font, text: str, color):
+        key = (id(font), text, color)
+        surf = self._cache.get(key)
+        if surf is None:
+            surf = font.render(text, True, color)
+            if len(self._cache) > 300:
+                self._cache.clear()
+            self._cache[key] = surf
+        return surf
 
     def draw_divider(self, y: int, theme):
         start = (self.x + 12, y)
@@ -87,7 +97,7 @@ class HUD:
             if is_active:
                 pygame.draw.rect(self.screen, theme["hud_accent"], rect, 1, border_radius=3)
 
-            lbl = self.font_tab.render(label, True, text_col)
+            lbl = self._render_text(self.font_tab, label, text_col)
             lx = tx + (tab_w - 4 - lbl.get_width()) // 2
             self.screen.blit(lbl, (lx, y + 4))
         return y + 30
@@ -100,7 +110,7 @@ class HUD:
         cur_x = self.x + 14
         cur_y = 12
 
-        title_surf = self.font_title.render("MAZESolver 2.0", True, (255, 255, 255))
+        title_surf = self._render_text(self.font_title, "MAZESolver 2.0", (255, 255, 255))
         self.screen.blit(title_surf, (cur_x, cur_y))
         cur_y += 24
 
@@ -109,20 +119,20 @@ class HUD:
 
         # tab 1: stats
         if self.active_tab == 1:
-            lbl_algo = self.font_label.render("Algorithm:", True, (150, 150, 150))
+            lbl_algo = self._render_text(self.font_label, "Algorithm:", (150, 150, 150))
             self.screen.blit(lbl_algo, (cur_x, cur_y))
             cur_y += 16
-            val_algo = self.font_bold.render(algo_name, True, theme["hud_accent"])
+            val_algo = self._render_text(self.font_bold, algo_name, theme["hud_accent"])
             self.screen.blit(val_algo, (cur_x, cur_y))
             cur_y += 20
 
-            lbl_maze = self.font_label.render("Maze File:", True, (150, 150, 150))
+            lbl_maze = self._render_text(self.font_label, "Maze File:", (150, 150, 150))
             self.screen.blit(lbl_maze, (cur_x, cur_y))
             cur_y += 16
             fname = os.path.basename(maze_filename)
             if len(fname) > 24:
                 fname = fname[:21] + "..."
-            val_maze = self.font_bold.render(fname, True, theme["hud_text"])
+            val_maze = self._render_text(self.font_bold, fname, theme["hud_text"])
             self.screen.blit(val_maze, (cur_x, cur_y))
             cur_y += 22
 
@@ -136,16 +146,16 @@ class HUD:
                 st_color = theme["hud_searching"]
 
             pygame.draw.circle(self.screen, st_color, (cur_x + 6, cur_y + 8), 5)
-            st_text = self.font_bold.render(status, True, st_color)
+            st_text = self._render_text(self.font_bold, status, st_color)
             self.screen.blit(st_text, (cur_x + 18, cur_y))
             cur_y += 24
 
             cur_y = self.draw_divider(cur_y, theme)
 
-            lbl_nodes = self.font_label.render("Nodes Explored:", True, (150, 150, 150))
+            lbl_nodes = self._render_text(self.font_label, "Nodes Explored:", (150, 150, 150))
             self.screen.blit(lbl_nodes, (cur_x, cur_y))
             cur_y += 16
-            val_nodes = self.font_value.render(str(nodes_explored), True, (255, 255, 255))
+            val_nodes = self._render_text(self.font_value, str(nodes_explored), (255, 255, 255))
             self.screen.blit(val_nodes, (cur_x, cur_y))
             cur_y += 22
 
@@ -159,46 +169,46 @@ class HUD:
                 bar_rect_fill = pygame.Rect(cur_x, cur_y, fill_w, 8)
                 pygame.draw.rect(self.screen, theme["hud_accent"], bar_rect_fill, border_radius=3)
             cur_y += 12
-            cov_lbl = self.font_small.render(f"Grid Coverage: {int(pct * 100)}%", True, (160, 160, 160))
+            cov_lbl = self._render_text(self.font_small, f"Grid Coverage: {int(pct * 100)}%", (160, 160, 160))
             self.screen.blit(cov_lbl, (cur_x, cur_y))
             cur_y += 18
 
-            lbl_path = self.font_label.render("Path Length:", True, (150, 150, 150))
+            lbl_path = self._render_text(self.font_label, "Path Length:", (150, 150, 150))
             self.screen.blit(lbl_path, (cur_x, cur_y))
             cur_y += 16
             p_str = f"{path_length} steps" if status == "SOLVED" else "--"
-            val_path = self.font_value.render(p_str, True, (255, 255, 255))
+            val_path = self._render_text(self.font_value, p_str, (255, 255, 255))
             self.screen.blit(val_path, (cur_x, cur_y))
             cur_y += 22
 
-            lbl_time = self.font_label.render("Compute Time:", True, (150, 150, 150))
+            lbl_time = self._render_text(self.font_label, "Compute Time:", (150, 150, 150))
             self.screen.blit(lbl_time, (cur_x, cur_y))
             cur_y += 16
-            val_time = self.font_bold.render(f"{time_taken * 1000:.2f} ms", True, (200, 200, 200))
+            val_time = self._render_text(self.font_bold, f"{time_taken * 1000:.2f} ms", (200, 200, 200))
             self.screen.blit(val_time, (cur_x, cur_y))
             cur_y += 22
 
         # tab 2: frontier
         elif self.active_tab == 2:
-            lbl_head = self.font_bold.render("Frontier Inspector:", True, theme["hud_accent"])
+            lbl_head = self._render_text(self.font_bold, "Frontier Inspector:", theme["hud_accent"])
             self.screen.blit(lbl_head, (cur_x, cur_y))
             cur_y += 20
 
             if frontier_snapshot:
-                count_lbl = self.font_small.render("Top 8 items in frontier:", True, (170, 170, 170))
+                count_lbl = self._render_text(self.font_small, "Top 8 items in frontier:", (170, 170, 170))
                 self.screen.blit(count_lbl, (cur_x, cur_y))
                 cur_y += 18
                 for idx, pos in enumerate(frontier_snapshot[:8]):
-                    item_text = self.font_label.render(f"[{idx}] Pos: {pos}", True, theme["hud_text"])
+                    item_text = self._render_text(self.font_label, f"[{idx}] Pos: {pos}", theme["hud_text"])
                     self.screen.blit(item_text, (cur_x + 6, cur_y))
                     cur_y += 18
             else:
-                msg = self.font_small.render("Frontier is currently empty.", True, (150, 150, 150))
+                msg = self._render_text(self.font_small, "Frontier is currently empty.", (150, 150, 150))
                 self.screen.blit(msg, (cur_x, cur_y))
                 cur_y += 24
 
             cur_y = self.draw_divider(cur_y, theme)
-            lbl_vis = self.font_label.render(f"Visited Set Size: {nodes_explored}", True, theme["hud_text"])
+            lbl_vis = self._render_text(self.font_label, f"Visited Set Size: {nodes_explored}", theme["hud_text"])
             self.screen.blit(lbl_vis, (cur_x, cur_y))
             cur_y += 22
 
@@ -219,7 +229,7 @@ class HUD:
                 is_hdr = line.endswith(":")
                 f = self.font_bold if is_hdr else self.font_small
                 col = theme["hud_accent"] if is_hdr else theme["hud_text"]
-                surf = f.render(line, True, col)
+                surf = self._render_text(f, line, col)
                 self.screen.blit(surf, (cur_x, cur_y))
                 cur_y += 19
 
@@ -230,11 +240,11 @@ class HUD:
 
         snd_str = "ON" if sound_enabled else "MUTED"
         info_line = f"Theme: {theme_name.upper()} | Audio: {snd_str} | Speed: {steps_per_frame}x"
-        self.screen.blit(self.font_small.render(info_line, True, theme["hud_accent"]), (cur_x, foot_y))
+        self.screen.blit(self._render_text(self.font_small, info_line, theme["hud_accent"]), (cur_x, foot_y))
         foot_y += 16
 
         controls = [("[SPACE] Pause", "[R] Reset"), ("[T] Cycle Theme", "[M] Mute Sound"), ("[S] Screenshot", "[G] Export GIF"), ("[1/2/3] Tabs", "[UP/DN] Speed")]
         for c1, c2 in controls:
-            self.screen.blit(self.font_small.render(c1, True, (160, 160, 160)), (cur_x, foot_y))
-            self.screen.blit(self.font_small.render(c2, True, (160, 160, 160)), (cur_x + 130, foot_y))
+            self.screen.blit(self._render_text(self.font_small, c1, (160, 160, 160)), (cur_x, foot_y))
+            self.screen.blit(self._render_text(self.font_small, c2, (160, 160, 160)), (cur_x + 130, foot_y))
             foot_y += 14

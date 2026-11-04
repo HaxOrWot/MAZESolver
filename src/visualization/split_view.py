@@ -29,11 +29,39 @@ class SplitPanel:
         self.status = "SEARCHING"
         self.revealed_visited = set()
 
+        # Pre-rendered canvas for instant 60fps rendering without per-frame cell loops
+        self.w = self.maze.cols * self.cell_size
+        self.h = self.maze.rows * self.cell_size
+        self.canvas_surf = pygame.Surface((self.w, self.h))
+        self.drawn_visited_idx = 0
+        self.drawn_path_idx = 0
+        self._init_canvas()
+
+    def _init_canvas(self):
+        self.canvas_surf.fill(self.theme["bg"])
+        wall_col = self.theme["wall"]
+        open_col = self.theme["open"]
+        border_col = self.theme["border"]
+        sz = self.cell_size
+        draw_border = sz > 8
+
+        for r in range(self.maze.rows):
+            for c in range(self.maze.cols):
+                col = wall_col if self.maze.is_wall((r, c)) else open_col
+                rect = pygame.Rect(c * sz, r * sz, sz, sz)
+                pygame.draw.rect(self.canvas_surf, col, rect)
+                if draw_border:
+                    pygame.draw.rect(self.canvas_surf, border_col, rect, 1)
+
+        self.drawn_visited_idx = 0
+        self.drawn_path_idx = 0
+
     def reset(self):
         self.current_step = 0
         self.path_reveal_step = 0
         self.revealed_visited.clear()
         self.status = "SEARCHING"
+        self._init_canvas()
 
     def advance(self, steps):
         if self.status == "SEARCHING":
@@ -53,46 +81,60 @@ class SplitPanel:
             if self.path_reveal_step >= len(self.solution_path):
                 self.status = "SOLVED"
 
+    def _sync_canvas(self):
+        sz = self.cell_size
+        draw_border = sz > 8
+        border_col = self.theme["border"]
+
+        # update visited nodes
+        if self.current_step > self.drawn_visited_idx:
+            vis_col = self.theme["visited_cold"]
+            for i in range(self.drawn_visited_idx, self.current_step):
+                pos = self.visited_nodes[i]
+                r, c = pos
+                rect = pygame.Rect(c * sz, r * sz, sz, sz)
+                pygame.draw.rect(self.canvas_surf, vis_col, rect)
+                if draw_border:
+                    pygame.draw.rect(self.canvas_surf, border_col, rect, 1)
+            self.drawn_visited_idx = self.current_step
+
+        # update path nodes
+        if self.path_reveal_step > self.drawn_path_idx:
+            path_col = self.theme["path"]
+            for i in range(self.drawn_path_idx, self.path_reveal_step):
+                pos = self.solution_path[i]
+                r, c = pos
+                rect = pygame.Rect(c * sz, r * sz, sz, sz)
+                pygame.draw.rect(self.canvas_surf, path_col, rect)
+                if draw_border:
+                    pygame.draw.rect(self.canvas_surf, border_col, rect, 1)
+            self.drawn_path_idx = self.path_reveal_step
+
     def draw(self, screen, font_title, font_stats):
+        # Column header
         hdr_rect = pygame.Rect(self.col_x, 0, self.col_w, self.header_height)
         pygame.draw.rect(screen, self.theme["hud_bg"], hdr_rect)
         hdr_lbl = font_title.render(self.algo_name, True, self.theme["hud_accent"])
         screen.blit(hdr_lbl, (self.col_x + 12, 8))
 
-        path_set = set(self.solution_path[: self.path_reveal_step])
-        frontier_pos = (
-            self.visited_nodes[self.current_step - 1]
-            if 0 < self.current_step <= len(self.visited_nodes)
-            else None
-        )
+        # 1. Incrementally update pre-rendered surface
+        self._sync_canvas()
 
-        for r in range(self.maze.rows):
-            for c in range(self.maze.cols):
-                pos = (r, c)
-                if pos == self.maze.start:
-                    col = self.theme["start"]
-                elif pos == self.maze.goal:
-                    col = self.theme["goal"]
-                elif pos in path_set:
-                    col = self.theme["path"]
-                elif pos == frontier_pos and self.status == "SEARCHING":
-                    col = self.theme["frontier"]
-                elif pos in self.revealed_visited:
-                    col = self.theme["visited_cold"]
-                elif self.maze.is_wall(pos):
-                    col = self.theme["wall"]
-                else:
-                    col = self.theme["open"]
+        # 2. Fast single blit of panel maze
+        screen.blit(self.canvas_surf, (self.maze_x, self.maze_y))
 
-                rect = pygame.Rect(
-                    self.maze_x + c * self.cell_size,
-                    self.maze_y + r * self.cell_size,
-                    self.cell_size,
-                    self.cell_size,
-                )
-                pygame.draw.rect(screen, col, rect)
-                if self.cell_size > 8:
-                    pygame.draw.rect(screen, self.theme["border"], rect, 1)
+        # 3. Dynamic Beacons & Frontier
+        sz = self.cell_size
+        if self.maze.start:
+            r, c = self.maze.start
+            pygame.draw.rect(screen, self.theme["start"], (self.maze_x + c * sz, self.maze_y + r * sz, sz, sz))
+        if self.maze.goal:
+            r, c = self.maze.goal
+            pygame.draw.rect(screen, self.theme["goal"], (self.maze_x + c * sz, self.maze_y + r * sz, sz, sz))
+
+        if self.status == "SEARCHING" and 0 < self.current_step <= len(self.visited_nodes):
+            fr_r, fr_c = self.visited_nodes[self.current_step - 1]
+            pygame.draw.rect(screen, self.theme["frontier"], (self.maze_x + fr_c * sz, self.maze_y + fr_r * sz, sz, sz))
 
         stat_y = self.maze_y + self.maze.rows * self.cell_size + 8
         st_color = (
@@ -216,6 +258,7 @@ class SplitRenderer:
                         self.theme = get_theme(self.theme_name)
                         for p in self.panels:
                             p.theme = self.theme
+                            p._init_canvas()
                     elif event.key == pygame.K_UP:
                         self.steps_per_frame = min(50, self.steps_per_frame + 2)
                     elif event.key == pygame.K_DOWN:

@@ -8,6 +8,14 @@ if PROJECT_ROOT not in sys.path:
 
 def main():
     if len(sys.argv) > 1:
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                if ctypes.windll.kernel32.AttachConsole(-1):
+                    sys.stdout = open("CONOUT$", "w", encoding="utf-8")
+                    sys.stderr = open("CONOUT$", "w", encoding="utf-8")
+            except Exception:
+                pass
         from src.main import main as cli_main
         cli_main()
     else:

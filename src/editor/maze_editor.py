@@ -73,6 +73,10 @@ class MazeEditor:
         self.status_msg = "Ready | Left-Click: Toggle Wall | Right-Click: S/G | B: BFS | Ctrl+S: Save"
         self.is_running = True
 
+        # Cached canvas surface for ultra-fast 60 FPS rendering without frame drops
+        self.canvas_surf = pygame.Surface((self.canvas_w, self.canvas_h))
+        self.dirty = True
+
     def _init_empty_grid(self):
         grid = [["#"] * self.cols for _ in range(self.rows)]
         for r in range(1, self.rows - 1):
@@ -91,6 +95,7 @@ class MazeEditor:
             self._re_detect_start_goal()
             self.solution_overlay.clear()
             self.status_msg = "Undid last action."
+            self.dirty = True
 
     def _re_detect_start_goal(self):
         self.start = None
@@ -144,6 +149,7 @@ class MazeEditor:
         self.goal = gen.goal
         self.solution_overlay.clear()
         self.status_msg = "Generated procedural maze."
+        self.dirty = True
 
     def solve_preview(self, algo="bfs"):
         if not self.start or not self.goal:
@@ -170,8 +176,38 @@ class MazeEditor:
             else:
                 self.solution_overlay.clear()
                 self.status_msg = f"{algo.upper()}: No solution path exists!"
+            self.dirty = True
         except Exception as e:
             self.status_msg = f"Solve error: {e}"
+
+    def _render_canvas(self):
+        """Draws all cells to the offscreen canvas surface only when dirty"""
+        self.canvas_surf.fill(self.theme["bg"])
+        for r in range(self.rows):
+            for c in range(self.cols):
+                pos = (r, c)
+                val = self.grid[r][c]
+                if val == "S":
+                    color = self.theme["start"]
+                elif val == "G":
+                    color = self.theme["goal"]
+                elif pos in self.solution_overlay:
+                    color = self.theme["path"]
+                elif val == "#":
+                    color = self.theme["wall"]
+                else:
+                    color = self.theme["open"]
+
+                rect = pygame.Rect(
+                    c * self.cell_size,
+                    r * self.cell_size,
+                    self.cell_size,
+                    self.cell_size,
+                )
+                pygame.draw.rect(self.canvas_surf, color, rect)
+                if self.cell_size > 10:
+                    pygame.draw.rect(self.canvas_surf, self.theme["border"], rect, 1)
+        self.dirty = False
 
     def run(self):
         drawing_wall = False
@@ -200,6 +236,7 @@ class MazeEditor:
                         self.grid[1][1] = "S"
                         self.grid[self.rows - 2][self.cols - 2] = "G"
                         self.solution_overlay.clear()
+                        self.dirty = True
                     elif event.key == pygame.K_b:
                         self.solve_preview("bfs")
                     elif event.key == pygame.K_d:
@@ -209,6 +246,7 @@ class MazeEditor:
                     elif event.key == pygame.K_t:
                         self.theme_name = next_theme(self.theme_name)
                         self.theme = get_theme(self.theme_name)
+                        self.dirty = True
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     pos = self._cell_at(*event.pos)
@@ -231,6 +269,7 @@ class MazeEditor:
                                     self.goal = None
                                 self.grid[r][c] = "#"
                                 drawing_wall = True
+                            self.dirty = True
 
                         elif event.button == 3:
                             if self.grid[r][c] != "S" and self.grid[r][c] != "G":
@@ -247,6 +286,7 @@ class MazeEditor:
                             else:
                                 self.goal = None
                                 self.grid[r][c] = " "
+                            self.dirty = True
 
                 elif event.type == pygame.MOUSEBUTTONUP:
                     drawing_wall = False
@@ -264,12 +304,14 @@ class MazeEditor:
                                     if (r, c) == self.goal:
                                         self.goal = None
                                     self.grid[r][c] = "#"
+                                    self.dirty = True
                                 elif drawing_open and self.grid[r][c] != " ":
                                     if (r, c) == self.start:
                                         self.start = None
                                     if (r, c) == self.goal:
                                         self.goal = None
                                     self.grid[r][c] = " "
+                                    self.dirty = True
 
             self.screen.fill(self.theme["bg"])
 
@@ -281,31 +323,10 @@ class MazeEditor:
             btn_text = "[Ctrl+S] Save | [Ctrl+G] Gen | [Ctrl+Z] Undo | [B] BFS | [D] DFS | [A] A* | [T] Theme | [ESC] Exit"
             self.screen.blit(self.font_btn.render(btn_text, True, self.theme["hud_accent"]), (14, 14))
 
-            # canvas
-            for r in range(self.rows):
-                for c in range(self.cols):
-                    pos = (r, c)
-                    val = self.grid[r][c]
-                    if val == "S":
-                        color = self.theme["start"]
-                    elif val == "G":
-                        color = self.theme["goal"]
-                    elif pos in self.solution_overlay:
-                        color = self.theme["path"]
-                    elif val == "#":
-                        color = self.theme["wall"]
-                    else:
-                        color = self.theme["open"]
-
-                    rect = pygame.Rect(
-                        self.offset_x + c * self.cell_size,
-                        self.offset_y + r * self.cell_size,
-                        self.cell_size,
-                        self.cell_size,
-                    )
-                    pygame.draw.rect(self.screen, color, rect)
-                    if self.cell_size > 10:
-                        pygame.draw.rect(self.screen, self.theme["border"], rect, 1)
+            # canvas - blit pre-rendered surface
+            if self.dirty:
+                self._render_canvas()
+            self.screen.blit(self.canvas_surf, (self.offset_x, self.offset_y))
 
             # statusbar
             sb_y = self.window_h - self.STATUSBAR_HEIGHT

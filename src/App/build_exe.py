@@ -10,7 +10,7 @@ ENTRY_POINT = os.path.join(APP_DIR, "main_app.py")
 
 def build():
     print("=" * 60)
-    print("Building Standalone MAZESolver.exe with Custom Icon...")
+    print("Building Standalone MAZESolver.exe (Windowed / No CMD Window)...")
     print("=" * 60)
 
     dist_dir = os.path.join(APP_DIR, "dist")
@@ -25,6 +25,7 @@ def build():
         "PyInstaller",
         "--name=MAZESolver",
         "--onefile",
+        "--noconsole",
         f"--icon={icon_path}",
         f"--distpath={dist_dir}",
         f"--workpath={build_dir}",

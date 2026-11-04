@@ -30,11 +30,5 @@ class Particle:
     def draw(self, screen):
         if not self.is_alive:
             return
-        alpha = max(0, min(255, int(self.life * 255)))
-        s = int(self.size * 2)
-        if s <= 0:
-            return
-        surf = pygame.Surface((s, s), pygame.SRCALPHA)
-        color_with_alpha = (*self.color[:3], alpha)
-        pygame.draw.rect(surf, color_with_alpha, (0, 0, s, s))
-        screen.blit(surf, (int(self.x - self.size), int(self.y - self.size)))
+        rad = max(1, int(self.size))
+        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), rad)

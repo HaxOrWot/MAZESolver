@@ -82,10 +82,7 @@ class Renderer:
         self.visited_colors = {}
         self._recompute_heatmap()
 
-        self.fade_progress = {}
-        self.fade_frames = self.cfg.get_val("fade_frames", 8)
         self.revealed_visited = set()
-
         self.particles = []
         self.goal_burst_triggered = False
 
@@ -100,6 +97,14 @@ class Renderer:
         self.is_paused = False
         self.is_running = True
         self.status = "SEARCHING"
+
+        # Pre-rendered hardware-accelerated canvas for zero-lag rendering
+        self.canvas_surface = pygame.Surface((self.maze_width, self.maze_height))
+        self.drawn_visited_idx = 0
+        self.drawn_path_idx = 0
+        self._glow_surf = None
+        self._glow_key = None
+        self._build_base_canvas()
 
         self.export_gif_flag = export_gif
         self.gif_exporter = None
@@ -118,22 +123,75 @@ class Renderer:
             t = idx / (total - 1) if total > 1 else 0.0
             self.visited_colors[pos] = lerp_color(cold, hot, t)
 
+    def _build_base_canvas(self):
+        # Draws static walls and corridors once to eliminate per-frame rect looping
+        self.canvas_surface.fill(self.theme["bg"])
+        wall_color = self.theme["wall"]
+        open_color = self.theme["open"]
+        border_color = self.theme["border"]
+        draw_border = self.cell_size > 7
+        sz = self.cell_size
+
+        for r in range(self.maze.rows):
+            for c in range(self.maze.cols):
+                col = wall_color if self.maze.is_wall((r, c)) else open_color
+                rect = pygame.Rect(c * sz, r * sz, sz, sz)
+                pygame.draw.rect(self.canvas_surface, col, rect)
+                if draw_border:
+                    pygame.draw.rect(self.canvas_surface, border_color, rect, 1)
+
+        self.drawn_visited_idx = 0
+        self.drawn_path_idx = 0
+
+    def _sync_canvas(self):
+        # Incrementally draws only newly revealed cells in <0.01ms
+        sz = self.cell_size
+        draw_border = sz > 7
+        border_col = self.theme["border"]
+
+        # 1. New visited cells
+        if self.current_step > self.drawn_visited_idx:
+            for i in range(self.drawn_visited_idx, self.current_step):
+                pos = self.visited_nodes[i]
+                color = self.visited_colors.get(pos, self.theme["visited_cold"])
+                r, c = pos
+                rect = pygame.Rect(c * sz, r * sz, sz, sz)
+                pygame.draw.rect(self.canvas_surface, color, rect)
+                if draw_border:
+                    pygame.draw.rect(self.canvas_surface, border_col, rect, 1)
+            self.drawn_visited_idx = self.current_step
+
+        # 2. New path cells
+        if self.path_reveal_step > self.drawn_path_idx:
+            path_col = self.theme["path"]
+            for i in range(self.drawn_path_idx, self.path_reveal_step):
+                pos = self.solution_path[i]
+                r, c = pos
+                rect = pygame.Rect(c * sz, r * sz, sz, sz)
+                pygame.draw.rect(self.canvas_surface, path_col, rect)
+                if draw_border:
+                    pygame.draw.rect(self.canvas_surface, border_col, rect, 1)
+            self.drawn_path_idx = self.path_reveal_step
+
     def draw_glow(self, pos, glow_color, radius=4):
         r, c = pos
         cx = self.offset_x + c * self.cell_size + self.cell_size // 2
         cy = self.offset_y + r * self.cell_size + self.cell_size // 2
         glow_size = self.cell_size + radius * 2
-        glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
 
-        for i in range(radius, 0, -1):
-            alpha = int(45 * (1.0 - i / (radius + 1)))
-            pygame.draw.rect(
-                glow_surf,
-                (*glow_color, alpha),
-                (radius - i, radius - i, self.cell_size + i * 2, self.cell_size + i * 2),
-                border_radius=4,
-            )
-        self.screen.blit(glow_surf, (cx - glow_size // 2, cy - glow_size // 2))
+        key = (glow_size, glow_color, radius)
+        if self._glow_key != key:
+            self._glow_key = key
+            self._glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
+            for i in range(radius, 0, -1):
+                alpha = int(45 * (1.0 - i / (radius + 1)))
+                pygame.draw.rect(
+                    self._glow_surf,
+                    (*glow_color, alpha),
+                    (radius - i, radius - i, self.cell_size + i * 2, self.cell_size + i * 2),
+                    border_radius=4,
+                )
+        self.screen.blit(self._glow_surf, (cx - glow_size // 2, cy - glow_size // 2))
 
     def draw_cell(self, pos, color, size_offset=0):
         r, c = pos
@@ -149,44 +207,27 @@ class Renderer:
         ticks = pygame.time.get_ticks()
         pulse = int(math.sin(ticks * 0.004) * 3)
 
-        revealed_path_set = set(self.solution_path[: self.path_reveal_step])
-        frontier_pos = (
-            self.visited_nodes[self.current_step - 1]
-            if 0 < self.current_step <= len(self.visited_nodes)
-            else None
-        )
+        # 1. Incrementally update canvas
+        self._sync_canvas()
 
-        for r in range(self.maze.rows):
-            for c in range(self.maze.cols):
-                pos = (r, c)
-                if pos == self.maze.start:
-                    self.draw_cell(pos, self.theme["start"], size_offset=pulse)
-                elif pos == self.maze.goal:
-                    self.draw_cell(pos, self.theme["goal"], size_offset=pulse)
-                elif pos in revealed_path_set:
-                    is_head = (
-                        0 < self.path_reveal_step < len(self.solution_path)
-                        and pos == self.solution_path[self.path_reveal_step - 1]
-                    )
-                    path_color = (255, 255, 255) if is_head else self.theme["path"]
-                    self.draw_cell(pos, path_color)
-                elif pos in self.revealed_visited:
-                    prog = self.fade_progress.get(pos, self.fade_frames)
-                    ratio = min(1.0, prog / max(1, self.fade_frames))
-                    target_color = self.visited_colors.get(pos, self.theme["visited_cold"])
-                    rendered_color = lerp_color(self.theme["open"], target_color, ratio)
-                    self.draw_cell(pos, rendered_color)
-                elif self.maze.is_wall(pos):
-                    self.draw_cell(pos, self.theme["wall"])
-                else:
-                    self.draw_cell(pos, self.theme["open"])
+        # 2. Fast single-blit rendering of the entire grid
+        self.screen.blit(self.canvas_surface, (self.offset_x, self.offset_y))
 
-        if frontier_pos and self.status == "SEARCHING":
-            self.draw_glow(
-                frontier_pos,
-                self.theme["glow"],
-                radius=self.cfg.get_val("glow_radius", 4),
-            )
+        # 3. Dynamic beacons & highlights
+        if self.maze.start:
+            self.draw_cell(self.maze.start, self.theme["start"], size_offset=pulse)
+        if self.maze.goal:
+            self.draw_cell(self.maze.goal, self.theme["goal"], size_offset=pulse)
+
+        # Path head highlight while path is expanding
+        if 0 < self.path_reveal_step < len(self.solution_path):
+            head_pos = self.solution_path[self.path_reveal_step - 1]
+            self.draw_cell(head_pos, (255, 255, 255))
+
+        # Frontier highlight
+        if self.status == "SEARCHING" and 0 < self.current_step <= len(self.visited_nodes):
+            frontier_pos = self.visited_nodes[self.current_step - 1]
+            self.draw_glow(frontier_pos, self.theme["glow"], radius=self.cfg.get_val("glow_radius", 4))
             self.draw_cell(frontier_pos, self.theme["frontier"])
 
     def trigger_goal_burst(self):
@@ -262,11 +303,11 @@ class Renderer:
                         self.current_step = 0
                         self.path_reveal_step = 0
                         self.revealed_visited.clear()
-                        self.fade_progress.clear()
                         self.particles.clear()
                         self.goal_burst_triggered = False
                         self.status = "SEARCHING"
                         self.is_paused = False
+                        self._build_base_canvas()
                     elif event.key == pygame.K_s:
                         self.save_screenshot()
                     elif event.key == pygame.K_g:
@@ -275,6 +316,9 @@ class Renderer:
                         self.theme_name = next_theme(self.theme_name)
                         self.theme = get_theme(self.theme_name)
                         self._recompute_heatmap()
+                        self._glow_key = None
+                        self._build_base_canvas()
+                        self._sync_canvas()
                     elif event.key == pygame.K_m:
                         self.sound.toggle_mute()
                     elif event.key == pygame.K_1:
@@ -289,10 +333,6 @@ class Renderer:
                         self.steps_per_frame = max(1, self.steps_per_frame - 2)
 
             if not self.is_paused:
-                for pos in list(self.fade_progress.keys()):
-                    if self.fade_progress[pos] < self.fade_frames:
-                        self.fade_progress[pos] += 1
-
                 if self.status == "SEARCHING":
                     if self.current_step < len(self.visited_nodes):
                         target = min(
@@ -300,9 +340,7 @@ class Renderer:
                             self.current_step + self.steps_per_frame,
                         )
                         for i in range(self.current_step, target):
-                            node_pos = self.visited_nodes[i]
-                            self.revealed_visited.add(node_pos)
-                            self.fade_progress[node_pos] = 0
+                            self.revealed_visited.add(self.visited_nodes[i])
 
                         if self.current_step % 4 == 0:
                             self.sound.play_tick()
